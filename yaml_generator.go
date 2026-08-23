@@ -40,7 +40,7 @@ func buildClients(clientAmount int) string {
 	return clients
 }
 
-func buildYml(clientAmount int) error {
+func buildYaml(clientAmount int) error {
 	content := fmt.Sprintf(baseCompose, buildClients(clientAmount))
 	const filename = "docker-compose.yaml"
 	file, err := os.Create(filename)
@@ -65,7 +65,7 @@ func main() {
 		fmt.Println("You must include a valid amount of clients")
 		return
 	}
-	err = buildYml(clientAmount)
+	err = buildYaml(clientAmount)
 	if err != nil {
 		fmt.Println(err)
 	}
