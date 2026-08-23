@@ -1,0 +1,1 @@
+go run yml_generator.go $1

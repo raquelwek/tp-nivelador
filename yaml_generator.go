@@ -1,0 +1,73 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+)
+
+const baseCompose = `services:
+  server:
+    build:
+      context: ./services/server
+      dockerfile: Dockerfile
+    container_name: server
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SERVER_HOST=server
+      - SERVER_PORT=5678
+%s`
+
+const baseClient = `
+  client_%d:
+    build:
+      context: ./services/client
+      dockerfile: Dockerfile
+    container_name: client_%d
+    environment:
+      - AGENCY_ID=%d
+      - SERVER_HOST=server
+      - SERVER_PORT=5678
+    depends_on:
+      - server
+`
+
+func buildClients(clientAmount int) string {
+	clients := ""
+	for i := 1; i <= clientAmount; i++ {
+		clients += fmt.Sprintf(baseClient, i, i, i)
+	}
+	return clients
+}
+
+func buildYml(clientAmount int) error {
+	content := fmt.Sprintf(baseCompose, buildClients(clientAmount))
+	const filename = "docker-compose.yaml"
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	file.WriteString(content)
+	return nil
+}
+
+func main() {
+	const argsLen = 2
+
+	if len(os.Args) != argsLen {
+		fmt.Fprintf(os.Stderr, "Not enough args, received %d, expected %d\n", len(os.Args), argsLen)
+		return
+	}
+
+	clientAmount, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		fmt.Println("You must include a valid amount of clients")
+		return
+	}
+	err = buildYml(clientAmount)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+}
