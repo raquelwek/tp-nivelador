@@ -6,12 +6,11 @@ import server
 
 SERVER_HOST = os.environ["SERVER_HOST"]
 SERVER_PORT = int(os.environ["SERVER_PORT"])
-OUTPUT_FILE = os.environ["OUTPUT_FILE"]
 
 
 def main():
     logger.init()
-    s = server.Server(SERVER_HOST, SERVER_PORT, OUTPUT_FILE)
+    s = server.Server(SERVER_HOST, SERVER_PORT)
     try:
         s.run()
     except Exception as e:

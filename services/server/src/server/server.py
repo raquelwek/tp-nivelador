@@ -6,10 +6,9 @@ _ECHO_SERVER_MESSAGE_SIZE = 1024
 
 
 class Server:
-    def __init__(self, server_host: str, server_port: int, output_file: str) -> None:
+    def __init__(self, server_host: str, server_port: int) -> None:
         self.server_host = server_host
         self.server_port = server_port
-        self.output_file = output_file
 
     def _handle_client(self, client_socket):
         action = "handle-client"
@@ -29,8 +28,6 @@ class Server:
                         message_amount,
                     )
                     return
-                response = str(client_message)
-                self.persist_response(response)
                 message_amount += 1
                 safe_socket.send_all(client_socket, client_message)
         except Exception as e:
@@ -54,11 +51,3 @@ class Server:
                 logger.info(action, logger.LogResult.success)
 
                 self._handle_client(client_socket)
-    
-    def persist_response(self, message:str):
-        action = "persist-response"
-        try:
-            with open(self.output_file, "a") as f:
-                f.write(f"{message}\n")
-        except Exception as e:
-            logger.error(action, logger.LogResult.fail)
