@@ -1,9 +1,7 @@
 package client
 
 import (
-	"bufio"
 	"net"
-	"os"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
@@ -21,7 +19,6 @@ type ClientConfig struct {
 	ServerHost string
 	ServerPort string
 	AgencyId   string
-	InputFile  string
 }
 
 type Client struct {
@@ -65,52 +62,31 @@ func (client *Client) Run() error {
 	const mainAction = "test-echo-server"
 	defer client.conn.Close()
 
-	file, err := os.Open(client.config.InputFile)
-	if err != nil {
-		logger.Error("open-file", logger.Fail, "err", err)
-		return err
-	}
-	defer file.Close()
+	for messageId := range ECHO_CLIENT_MESSAGE_AMOUNT {
+		messageArgs := []any{"agency-id", client.config.AgencyId, "message-id", messageId}
+		logger.Info(mainAction, logger.InProgress, messageArgs...)
 
-	scanner := bufio.NewScanner(file)
+		clientMessage := client.config.AgencyId
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		err := client.sendBet(line, mainAction)
-		if err != nil {
+		if err := safe_socket.SendAll(client.conn, []byte(clientMessage)); err != nil {
+			logger.Error("send-message", logger.Fail, messageArgs...)
 			return err
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		return err
-	}
+		responseBuffer, err := safe_socket.RecvAll(client.conn, ECHO_CLIENT_BUFFER_SIZE)
+		if err != nil {
+			logger.Error("recv-response", logger.Fail, messageArgs...)
+			return err
+		}
 
+		if string(responseBuffer) != clientMessage {
+			logger.Error("check-response", logger.Fail, messageArgs...)
+			return err
+		}
+
+		time.Sleep(ECHO_CLIENT_MESSAGE_DELAY_MS * time.Millisecond)
+	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
-	return nil
-}
-
-func (client *Client) sendBet(line string, mainAction string) error {
-	messageArgs := []any{"agency-id", client.config.AgencyId}
-	logger.Info(mainAction, logger.InProgress, messageArgs...)
-
-	if err := safe_socket.SendAll(client.conn, []byte(line)); err != nil {
-		logger.Error("send-message", logger.Fail, messageArgs...)
-		return err
-	}
-
-	responseBuffer, err := safe_socket.RecvAll(client.conn, ECHO_CLIENT_BUFFER_SIZE)
-	if err != nil {
-		logger.Error("recv-response", logger.Fail, messageArgs...)
-		return err
-	}
-
-	if string(responseBuffer) != line {
-		logger.Error("check-response", logger.Fail, messageArgs...)
-		return err
-	}
-
-	time.Sleep(ECHO_CLIENT_MESSAGE_DELAY_MS * time.Millisecond)
 
 	return nil
 }
