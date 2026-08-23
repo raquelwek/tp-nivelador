@@ -19,6 +19,7 @@ class Server:
                 client_message = safe_socket.recv_all(
                     client_socket, _ECHO_SERVER_MESSAGE_SIZE
                 )
+                logger.info("recvd_message",logger.LogResult.success,"message",str(client_message))
                 if not client_message:
                     logger.info(
                         action,

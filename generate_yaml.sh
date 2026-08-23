@@ -1,1 +1,1 @@
-go run yml_generator.go $1
+go run yaml_generator.go $1
