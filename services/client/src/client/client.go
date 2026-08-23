@@ -17,11 +17,14 @@ const ECHO_CLIENT_BUFFER_SIZE = 512
 const ECHO_CLIENT_MESSAGE_AMOUNT = 3
 const ECHO_CLIENT_MESSAGE_DELAY_MS = 1000
 
+const FILE_PERMISSIONS_CODE = 0644
+
 type ClientConfig struct {
 	ServerHost string
 	ServerPort string
 	AgencyId   string
 	InputFile  string
+	OutputFile string
 }
 
 type Client struct {
@@ -105,6 +108,10 @@ func (client *Client) sendBet(line string, mainAction string) error {
 		return err
 	}
 
+	if err := client.persistResponse(responseBuffer); err != nil {
+		return err
+	}
+
 	if string(responseBuffer) != line {
 		logger.Error("check-response", logger.Fail, messageArgs...)
 		return err
@@ -112,5 +119,16 @@ func (client *Client) sendBet(line string, mainAction string) error {
 
 	time.Sleep(ECHO_CLIENT_MESSAGE_DELAY_MS * time.Millisecond)
 
+	return nil
+}
+
+func (client *Client) persistResponse(content []byte) error {
+	const action = "persist-response"
+
+	if err := os.WriteFile(client.config.OutputFile, content, FILE_PERMISSIONS_CODE); err != nil {
+		logger.Error(action, logger.Fail, "err", err)
+		return err
+	}
+	logger.Info(action, logger.Success)
 	return nil
 }
