@@ -20,6 +20,7 @@ const baseCompose = `services:
       - "5678:5678"
 %s`
 
+// @ TODO: Hacer variable input y output
 const baseClient = `
   client_%d:
     build:
@@ -30,8 +31,13 @@ const baseClient = `
       - AGENCY_ID=%d
       - SERVER_HOST=server
       - SERVER_PORT=5678
+	  - INPUT_FILE=/input/input-0.csv 
+	  - OUTPUT_FILE=/output/prueba.txt 
     depends_on:
       - server
+    volumes:
+	  - ./input:/input
+	  - ./output:/output
 `
 
 func buildClients(clientAmount int) string {
