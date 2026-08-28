@@ -39,6 +39,8 @@ class Server:
                     # @TO DO: Manage concurrency to wait until AGENCY_QUORUM_MIN is reached
                     winners_message = self.getWinners()
                     self.send_message(client_socket, winners_message)
+                    return 
+                
                 elif client_message.type == BETS:
                     self.handle_bets_message(client_message)
 
@@ -81,7 +83,7 @@ class Server:
 
     def handle_bets_message(self, message: Message):
         action = "handle-bets-message"
-        self.lottery.add_bets(message.bets)
+        self.lottery.store_bets(message.bets)
         logger.info(action, logger.LogResult.success, "bets-count", len(message.bets))
 
     def getWinners(self) -> WinnersMessage:
