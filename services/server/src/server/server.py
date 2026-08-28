@@ -16,10 +16,14 @@ class Server:
     def _handle_client(self, client_socket):
         action = "handle-client"
         message_amount = 0
+        agency_id = None
         try:
             logger.info(action, logger.LogResult.in_progress)
             while True:
                 client_message = self.recv_message(client_socket)
+                if agency_id is None:
+                    agency_id = client_message.agency_id
+
                 
                 if not client_message:
                     logger.info(
@@ -32,7 +36,8 @@ class Server:
                 message_amount += 1
 
                 if client_message.type == ALL_SENDED:  
-                    winners_message = WinnersMessage(client_message.agency_id)
+                    # @TO DO: Manage concurrency to wait until AGENCY_QUORUM_MIN is reached
+                    winners_message = self.getWinners()
                     self.send_message(client_socket, winners_message)
                 elif client_message.type == BETS:
                     self.handle_bets_message(client_message)
@@ -74,4 +79,20 @@ class Server:
         client_socket.send_all(message_bytes)
         logger.info(action, logger.LogResult.success, "message", str(message))
 
-    def 
+    def handle_bets_message(self, message: Message):
+        action = "handle-bets-message"
+        self.lottery.add_bets(message.bets)
+        logger.info(action, logger.LogResult.success, "bets-count", len(message.bets))
+
+    def getWinners(self) -> WinnersMessage:
+        action = "get-winners"
+        winners_message = WinnersMessage(0)
+        winners = 0
+        for bet in self.lottery.load_bets():
+            if not self.lottery.has_won(bet):
+                continue
+            winners_message.add_bet(bet)
+            winners += 1
+
+        logger.info(action, logger.LogResult.success, "winners-count", winners)
+        return winners_message
