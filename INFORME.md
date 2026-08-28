@@ -32,6 +32,7 @@ Análogamente actúa la agencia 2, pero es importante notar que luego de que amb
 
 En caso de que haya algún tipo de error en la comunicación tanto servidor como cliente deben cerrar la conexión y terminar la ejecución, sea interno o por un mesaje recibido. 
 ## Estructura de mensajes
+En este caso, se implementó la serialización y deserialización de los mensajes enviados por la red que se mapean a un clase directa para poder manipularlos mejor en el código existente de las apuestas.
 
 ### Header de el paquete
 
@@ -50,6 +51,8 @@ Todos los mensajes comparten un *header común*, el cual tiene la siguiente estr
 - `Agency ID (1B)`: Identificador de la agencia que envía el mensaje.
 - `Payload Length (4B)`: Indica la longitud del payload en bytes.
 - `Payload`: Contiene la información específica del mensaje, como los registros de apuestas o ganadores.
+
+*Nota:* A nivel código, se implementó una clase abstracta `Message` que define la estructura y comportamiento común de todos los mensajes, incluyendo métodos para serializar y deserializar el header y el payload, los cuales varían según el tipo y de ahí que cada uno tenga subclase particular que hereda de `Message` y define su propio comportamiento para el payload. [Ver implementación](services/server/src/server/protocol/messages.py)
 
 ### `BETS` payload
 Luego, para hacer posible el envío de varios registros de apuestas en un solo mensaje, definimos la estructura del payload para el mensaje BETS de la siguiente manera:
