@@ -31,4 +31,69 @@ Análogamente actúa la agencia 2, pero es importante notar que luego de que amb
 </p>
 
 En caso de que haya algún tipo de error en la comunicación tanto servidor como cliente deben cerrar la conexión y terminar la ejecución, sea interno o por un mesaje recibido. 
-## Estructuras de mensajes
+## Estructura de mensajes
+
+### Header de el paquete
+
+Todos los mensajes comparten un *header común*, el cual tiene la siguiente estructura:
+```
+ 0                   1                   2                   3   
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|     Type      |   Agency ID   |         Payload Length        
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        Payload Length (cont.)  |         Payload ...           |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+- `Type (1B)`: Indica el tipo de mensaje (BETS, WINNERS, ERROR, ALL_SENDED). 
+- `Agency ID (1B)`: Identificador de la agencia que envía el mensaje.
+- `Payload Length (4B)`: Indica la longitud del payload en bytes.
+- `Payload`: Contiene la información específica del mensaje, como los registros de apuestas o ganadores.
+
+### `BETS` payload
+Luego, para hacer posible el envío de varios registros de apuestas en un solo mensaje, definimos la estructura del payload para el mensaje BETS de la siguiente manera:
+```
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|          Bet Count (2B)       |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|      Bet Record 1 (variable)  |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|              ...              |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|      Bet Record N (variable)  |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+- `Bet Count (2B)`: Indica la cantidad de registros de apuestas incluidos en el mensaje.
+- `Bet Record (variable)`: Cada registro de apuesta tiene una estructura definida que incluye la información de la misma, de la siguiente manerA:
+
+```
++----------------+----------------+----------------+----------------+
+|                        Document (4B)                              |
++----------------+----------------+----------------+----------------+
+|         Number (2B)              | FN Len (1B) | LN Len (1B)      |
++----------------+----------------+----------------+----------------+
+|                    Birthdate (8B, "YYYYMMDD")                     |
++-------------------------------------------------------------------+
+|              First Name (FN Len bytes, UTF-8)                     |
++-------------------------------------------------------------------+
+|              Last Name (LN Len bytes, UTF-8)                      |
++-------------------------------------------------------------------+
+```
+
+### `WINNERS` payload
+Análogo al mensaje BETS, solo que en este caso el payload contendrá los registros de apuestas ganadoras, con la misma estructura de registro de apuesta definida anteriormente.
+
+
+### `ERROR` payload
+
+```
++---------------------------------------------------------------------+
+|                    Message (variable, UTF-8)                        |
++---------------------------------------------------------------------+
+```
+- `Message (variable)`: Contiene un mensaje de error descriptivo en formato UTF-8.
+
+### `ALL_SENDED` payload
+El mensaje `ALL_SENDED` no contiene payload, ya que su función es únicamente indicar que el cliente ha terminado de enviar todos los registros de apuestas.
