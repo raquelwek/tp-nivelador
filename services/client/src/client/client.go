@@ -1,8 +1,8 @@
 package client
 
 import (
+	"encoding/binary"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
@@ -102,6 +102,7 @@ func (client *Client) Run() error {
 	}
 	// TODO: Implementar guardado
 	winners := protocol.CreateMessage(byte(agencyId), protocol.CreateWinnersPayload(BATCH_SIZE))
+
 	err = agency.StoreWinner(winners)
 	if err != nil {
 		logger.Error(mainAction, logger.Fail, "err", err)
@@ -130,13 +131,24 @@ func (client *Client) send(message protocol.Message, mainAction string) error {
 	return nil
 }
 
-func (client *Client) persistResponse(content []byte) error {
-	const action = "persist-response"
+func (client *Client) receive(mainAction string) (protocol.Message, error) {
+	messageArgs := []any{"agency-id", client.config.AgencyId}
+	logger.Info(mainAction, logger.InProgress, messageArgs...)
 
-	if err := os.WriteFile(client.config.OutputFile, content, FILE_PERMISSIONS_CODE); err != nil {
-		logger.Error(action, logger.Fail, "err", err)
-		return err
+	bytes_header, err := safe_socket.RecvAll(client.conn, protocol.HeaderLength)
+	payloadLength := (int)(binary.BigEndian.Uint32(bytes_header[2:6]))
+	bytes_payload, err := safe_socket.RecvAll(client.conn, payloadLength)
+	if err != nil {
+		logger.Error("receive-message", logger.Fail, messageArgs...)
+		return nil, err
 	}
-	logger.Info(action, logger.Success)
-	return nil
+	message, err := protocol.UnmarshalMessage(append(bytes_header, bytes_payload...), BATCH_SIZE)
+	if err != nil {
+		logger.Error("unmarshal-message", logger.Fail, messageArgs...)
+		return nil, err
+	}
+
+	logger.Info(mainAction, logger.Success, messageArgs...)
+	return message, nil
+
 }

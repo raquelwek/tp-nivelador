@@ -50,6 +50,7 @@ func (m *MessageImpl) Marshal() ([]byte, error) {
 	return append(header, payloadBytes...), nil
 }
 
+// @ To do revisar batchsize
 func UnmarshalMessage(data []byte, batchSize int) (Message, error) {
 	if len(data) < HeaderLength {
 		return nil, fmt.Errorf("data too short to be a valid message header")
