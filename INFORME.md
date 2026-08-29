@@ -124,3 +124,4 @@ Verifica que no se agreguen más de los que deberían entrar en un batch.
 '''
 add_bet(bet: Bet) -> None
 ```
+
