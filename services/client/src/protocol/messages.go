@@ -24,6 +24,7 @@ type Payload interface {
 
 type Message interface {
 	Marshal() ([]byte, error)
+	GetPayload() Payload
 }
 type MessageImpl struct {
 	AgencyID byte
@@ -48,6 +49,10 @@ func (m *MessageImpl) Marshal() ([]byte, error) {
 	binary.BigEndian.PutUint32(header[2:6], uint32(len(payloadBytes)))
 
 	return append(header, payloadBytes...), nil
+}
+
+func (m *MessageImpl) GetPayload() Payload {
+	return m.Payload
 }
 
 // @ To do revisar batchsize

@@ -10,23 +10,23 @@ import (
 
 // / mantains shared logic for BetsPayload and WinnersPayload
 type betRecordList struct {
-	records   []lottery.Bet
+	Records   []lottery.Bet
 	batchSize int
 }
 
 func (b *betRecordList) AddBet(bet lottery.Bet) error {
-	if len(b.records) >= b.batchSize {
+	if len(b.Records) >= b.batchSize {
 		return fmt.Errorf("cannot add bet: batch is full (max %d)", b.batchSize)
 	}
-	b.records = append(b.records, bet)
+	b.Records = append(b.Records, bet)
 	return nil
 }
 
 func (b *betRecordList) MarshalPayload() ([]byte, error) {
 	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, uint16(len(b.records))) //@TO DO; check if its useful xd
+	binary.BigEndian.PutUint16(buf, uint16(len(b.Records))) //@TO DO; check if its useful xd
 
-	for _, bet := range b.records {
+	for _, bet := range b.Records {
 		record := marshalBetRecord(bet)
 		buf = append(buf, record...)
 	}
@@ -42,7 +42,7 @@ func (p *betRecordList) UnmarshalPayload(data []byte) error {
 
 	for i := 0; i < int(count); i++ {
 		bet, new_offset := UnmarshalBetRecord(offset, data)
-		p.records = append(p.records, bet)
+		p.Records = append(p.Records, bet)
 		offset = new_offset
 	}
 	return nil
@@ -67,7 +67,9 @@ func (p *WinnersPayload) Type() MessageType { return WINNERS }
 func CreateWinnersPayload(batchSize int) *WinnersPayload {
 	return &WinnersPayload{betRecordList{batchSize: batchSize}}
 }
-
+func (p *WinnersPayload) GetWinners() []lottery.Bet {
+	return p.Records
+}
 func marshalBetRecord(bet lottery.Bet) []byte {
 	payload := make([]byte, 0)
 

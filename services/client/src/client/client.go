@@ -100,10 +100,18 @@ func (client *Client) Run() error {
 		logger.Error(mainAction, logger.Fail, "err", sendErr)
 		return sendErr
 	}
-	// TODO: Implementar guardado
-	winners := protocol.CreateMessage(byte(agencyId), protocol.CreateWinnersPayload(BATCH_SIZE))
 
-	err = agency.StoreWinner(winners)
+	winners, err := client.receive(mainAction)
+	if err != nil {
+		return err
+	}
+	winnersPayload, ok := winners.GetPayload().(*protocol.WinnersPayload)
+	if !ok {
+		logger.Error(mainAction, logger.Fail, "err", "invalid payload type")
+		return err
+	}
+
+	err = agency.StoreWinner(winnersPayload.GetWinners())
 	if err != nil {
 		logger.Error(mainAction, logger.Fail, "err", err)
 		return err
