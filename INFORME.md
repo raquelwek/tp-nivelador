@@ -100,3 +100,27 @@ Análogo al mensaje BETS, solo que en este caso el payload contendrá los regist
 
 ### `ALL_SENDED` payload
 El mensaje `ALL_SENDED` no contiene payload, ya que su función es únicamente indicar que el cliente ha terminado de enviar todos los registros de apuestas.
+
+
+## Implementación
+
+Partiendo de las clases en `services/server/src_frozen` que establecen el modelo de dominio de la aplicación, se implementaron clases análogas para el cliente en Go.
+Lo que se buscaba es que la aplicación se abstraiga de la serialización y deserialización de los mensajes, para que el cliente pueda enviar y recibir mensajes de manera sencilla, sin preocuparse por los detalles del protocolo, 
+es por eso que conectamos las clases que simbolizaban los mensajes con las clases que representaban el modelo de dominio, de manera que el cliente pueda enviar y recibir mensajes de manera sencilla.
+
+Ejemplo de métodos que se usan para serializar y deserializar los mensajes, sin importar su tipo.
+
+```python
+marshall() -> bytes
+unmarshall(data: bytes) -> Message
+```
+
+Si bien estos mismos no utilizan la clase `Bet`explícitamente, en el caso de que sea un mensaje de tipo `BETS` o `WINNERS`, el payload contendrá registros de apuestas, por lo que se implementaron métodos para convertir entre la clase `Bet` y la estructura de registro de apuesta definida en el protocolo.
+
+```python
+'''
+Agrega un registro de apuesta que se usará para serializar y enviar en un mensaje de tipo `BETS` o `WINNERS`.
+Verifica que no se agreguen más de los que deberían entrar en un batch.
+'''
+add_bet(bet: Bet) -> None
+```
