@@ -4,7 +4,7 @@ type Bet struct {
 	AgencyId  int
 	FirstName string
 	LastName  string
-	Document  string
+	Document  int
 	Birthdate string
 	Number    int
 }
