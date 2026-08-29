@@ -1,10 +1,19 @@
+package model
+
+import (
+	"encoding/csv"
+	"fmt"
+	"os"
+	"strconv"
+)
+
 type AgencyImpl struct {
 	Id         int
 	OutputFile string
 	InputFile  string
 }
 
-func createAgency(id int, outputFile string, inputFile string) *AgencyImpl {
+func CreateAgency(id int, outputFile string, inputFile string) *AgencyImpl {
 	return &AgencyImpl{
 		Id:         id,
 		OutputFile: outputFile,
@@ -22,7 +31,7 @@ func (a *AgencyImpl) GetBets() ([]Bet, error) {
 	reader := csv.NewReader(file)
 	var bets []Bet
 	number := 0
-	for row, err := reader.Read(); err == nil; row, err = reader.Read(), number++ {
+	for row, err := reader.Read(); err == nil; row, err = reader.Read() {
 		name, lastName, document, birthdate := row[1], row[2], row[3], row[4]
 
 		num, err := strconv.Atoi(document)
@@ -34,12 +43,13 @@ func (a *AgencyImpl) GetBets() ([]Bet, error) {
 			AgencyId:  a.Id,
 			FirstName: name,
 			LastName:  lastName,
-			Document:  document,
+			Document:  num,
 			Birthdate: birthdate,
 			Number:    number,
 		}
 
 		bets = append(bets, bet)
+		number++
 	}
 	return bets, nil
 }
@@ -59,8 +69,9 @@ func (a *AgencyImpl) StoreWinner(winningBets []Bet) error {
 			strconv.Itoa(bet.AgencyId),
 			bet.FirstName,
 			bet.LastName,
-			bet.Document,
-			bet.Birthdate
+			strconv.Itoa(bet.Document),
+			bet.Birthdate,
+			strconv.Itoa(bet.Number),
 		}
 
 		err := writer.Write(row)

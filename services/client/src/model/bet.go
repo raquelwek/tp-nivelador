@@ -1,4 +1,4 @@
-package lottery
+package model
 
 type Bet struct {
 	AgencyId  int

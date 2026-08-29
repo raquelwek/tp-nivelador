@@ -10,23 +10,23 @@ import (
 
 // / mantains shared logic for BetsPayload and WinnersPayload
 type betRecordList struct {
-	Records   []lottery.Bet
-	BatchSize int
+	records   []lottery.Bet
+	batchSize int
 }
 
 func (b *betRecordList) AddBet(bet lottery.Bet) error {
-	if len(b.Records) >= b.BatchSize {
-		return fmt.Errorf("cannot add bet: batch is full (max %d)", b.BatchSize)
+	if len(b.records) >= b.batchSize {
+		return fmt.Errorf("cannot add bet: batch is full (max %d)", b.batchSize)
 	}
-	b.Records = append(b.Records, bet)
+	b.records = append(b.records, bet)
 	return nil
 }
 
 func (b *betRecordList) MarshalPayload() ([]byte, error) {
 	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, uint16(len(b.Records))) //@TO DO; check if its useful xd
+	binary.BigEndian.PutUint16(buf, uint16(len(b.records))) //@TO DO; check if its useful xd
 
-	for _, bet := range b.Records {
+	for _, bet := range b.records {
 		record := marshalBetRecord(bet)
 		buf = append(buf, record...)
 	}
@@ -42,7 +42,7 @@ func (p *betRecordList) UnmarshalPayload(data []byte) error {
 
 	for i := 0; i < int(count); i++ {
 		bet, new_offset := UnmarshalBetRecord(offset, data)
-		p.Records = append(p.Records, bet)
+		p.records = append(p.records, bet)
 		offset = new_offset
 	}
 	return nil
@@ -52,8 +52,8 @@ type BetsPayload struct {
 	betRecordList
 }
 
-func createBetsPayload(batchSize int) *BetsPayload {
-	return &BetsPayload{betRecordList{BatchSize: batchSize}}
+func CreateBetsPayload(batchSize int) *BetsPayload {
+	return &BetsPayload{betRecordList{batchSize: batchSize}}
 }
 
 func (p *BetsPayload) Type() MessageType { return BETS }
@@ -64,8 +64,8 @@ type WinnersPayload struct {
 
 func (p *WinnersPayload) Type() MessageType { return WINNERS }
 
-func createWinnersPayload(batchSize int) *WinnersPayload {
-	return &WinnersPayload{betRecordList{BatchSize: batchSize}}
+func CreateWinnersPayload(batchSize int) *WinnersPayload {
+	return &WinnersPayload{betRecordList{batchSize: batchSize}}
 }
 
 func marshalBetRecord(bet lottery.Bet) []byte {

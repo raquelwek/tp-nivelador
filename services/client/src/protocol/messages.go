@@ -22,12 +22,21 @@ type Payload interface {
 	Type() MessageType
 }
 
-type Message struct {
+type Message interface {
+	Marshal() ([]byte, error)
+}
+type MessageImpl struct {
 	AgencyID byte
 	Payload  Payload
 }
 
-func (m *Message) Marshal() ([]byte, error) {
+func CreateMessage(agencyID byte, payload Payload) Message {
+	return &MessageImpl{
+		AgencyID: agencyID,
+		Payload:  payload,
+	}
+}
+func (m *MessageImpl) Marshal() ([]byte, error) {
 	payloadBytes, err := m.Payload.MarshalPayload()
 	if err != nil {
 		return nil, err
@@ -41,7 +50,7 @@ func (m *Message) Marshal() ([]byte, error) {
 	return append(header, payloadBytes...), nil
 }
 
-func UnmarshalMessage(data []byte, batchSize int) (*Message, error) {
+func UnmarshalMessage(data []byte, batchSize int) (Message, error) {
 	if len(data) < HeaderLength {
 		return nil, fmt.Errorf("data too short to be a valid message header")
 	}
@@ -57,13 +66,13 @@ func UnmarshalMessage(data []byte, batchSize int) (*Message, error) {
 	var payload Payload
 	switch msgType {
 	case BETS:
-		payload = createBetsPayload(batchSize)
+		payload = CreateBetsPayload(batchSize)
 	case ALL_SENDED:
-		payload = createAllSendedPayload()
+		payload = CreateAllSendedPayload()
 	case WINNERS:
-		payload = createWinnersPayload(batchSize)
+		payload = CreateWinnersPayload(batchSize)
 	case ERROR:
-		payload = createErrorPayload("")
+		payload = CreateErrorPayload("")
 	default:
 		return nil, fmt.Errorf("unknown message type: %v", msgType)
 	}
@@ -73,5 +82,5 @@ func UnmarshalMessage(data []byte, batchSize int) (*Message, error) {
 		return nil, err
 	}
 
-	return &Message{AgencyID: agencyID, Payload: payload}, nil
+	return &MessageImpl{AgencyID: agencyID, Payload: payload}, nil
 }

@@ -1,19 +1,21 @@
 package client
 
 import (
-	"bufio"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
+	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/model"
+	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/protocol"
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
 const CONNECTION_ATTEMPTS_MAX = 3
 const CONNECTION_ATTEMPS_DELAY_MS = 200
 
-const ECHO_CLIENT_BUFFER_SIZE = 512
+const BATCH_SIZE = 512
 const ECHO_CLIENT_MESSAGE_AMOUNT = 3
 const ECHO_CLIENT_MESSAGE_DELAY_MS = 1000
 
@@ -65,27 +67,44 @@ func connectToServer(host, port string) (net.Conn, error) {
 }
 
 func (client *Client) Run() error {
-	const mainAction = "test-echo-server"
-	defer client.conn.Close()
-
-	file, err := os.Open(client.config.InputFile)
+	const mainAction = "test-lottery-server"
+	agencyId, err := strconv.Atoi(client.config.AgencyId)
 	if err != nil {
-		logger.Error("open-file", logger.Fail, "err", err)
+		logger.Error(mainAction, logger.Fail, "err", err)
 		return err
 	}
-	defer file.Close()
+	agency := model.CreateAgency(agencyId, client.config.OutputFile, client.config.InputFile)
 
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		err := client.sendBet(line, mainAction)
-		if err != nil {
-			return err
+	agencyBets, err := agency.GetBets()
+	if err != nil {
+		logger.Error(mainAction, logger.Fail, "err", err)
+		return err
+	}
+	payload := protocol.CreateBetsPayload(BATCH_SIZE)
+	for _, bet := range agencyBets {
+		err := payload.AddBet(bet)
+		if err.Error() == "cannot add bet: batch is full" {
+			message := protocol.CreateMessage(byte(agencyId), payload)
+			client.send(message, mainAction)
+			err = client.send(message, mainAction)
+			if err != nil {
+				logger.Error(mainAction, logger.Fail, "err", err)
+				return err
+			}
+			payload = protocol.CreateBetsPayload(BATCH_SIZE)
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
+	allSended := protocol.CreateMessage(byte(agencyId), protocol.CreateAllSendedPayload())
+	sendErr := client.send(allSended, mainAction)
+	if sendErr != nil {
+		logger.Error(mainAction, logger.Fail, "err", sendErr)
+		return sendErr
+	}
+	// TODO: Implementar guardado
+	winners := protocol.CreateMessage(byte(agencyId), protocol.CreateWinnersPayload(BATCH_SIZE))
+	err = agency.StoreWinner(winners)
+	if err != nil {
+		logger.Error(mainAction, logger.Fail, "err", err)
 		return err
 	}
 
@@ -93,31 +112,20 @@ func (client *Client) Run() error {
 	return nil
 }
 
-func (client *Client) sendBet(line string, mainAction string) error {
+func (client *Client) send(message protocol.Message, mainAction string) error {
 	messageArgs := []any{"agency-id", client.config.AgencyId}
 	logger.Info(mainAction, logger.InProgress, messageArgs...)
 
-	if err := safe_socket.SendAll(client.conn, []byte(line)); err != nil {
+	bytes, err := message.Marshal()
+	if err != nil {
+		logger.Error("marshal-message", logger.Fail, messageArgs...)
+		return err
+	}
+
+	if err := safe_socket.SendAll(client.conn, bytes); err != nil {
 		logger.Error("send-message", logger.Fail, messageArgs...)
 		return err
 	}
-
-	responseBuffer, err := safe_socket.RecvAll(client.conn, ECHO_CLIENT_BUFFER_SIZE)
-	if err != nil {
-		logger.Error("recv-response", logger.Fail, messageArgs...)
-		return err
-	}
-
-	if err := client.persistResponse(responseBuffer); err != nil {
-		return err
-	}
-
-	if string(responseBuffer) != line {
-		logger.Error("check-response", logger.Fail, messageArgs...)
-		return err
-	}
-
-	time.Sleep(ECHO_CLIENT_MESSAGE_DELAY_MS * time.Millisecond)
 
 	return nil
 }

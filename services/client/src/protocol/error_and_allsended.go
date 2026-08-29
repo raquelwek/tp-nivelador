@@ -4,7 +4,7 @@ type ErrorPayload struct {
 	Message string
 }
 
-func createErrorPayload(message string) *ErrorPayload {
+func CreateErrorPayload(message string) *ErrorPayload {
 	return &ErrorPayload{
 		Message: message,
 	}
@@ -26,7 +26,7 @@ func (p *ErrorPayload) Type() MessageType {
 type AllSendedPayload struct {
 }
 
-func createAllSendedPayload() *AllSendedPayload {
+func CreateAllSendedPayload() *AllSendedPayload {
 	return &AllSendedPayload{}
 }
 func (p *AllSendedPayload) MarshalPayload() ([]byte, error) {
