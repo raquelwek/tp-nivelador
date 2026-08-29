@@ -1,5 +1,5 @@
-from .messages import Message, ALL_SENDED, ERROR
 from __future__ import annotations
+from .messages import Message, ALL_SENDED, ERROR
 
 class AllSendedMessage(Message):
     def __init__(self, agency_id: int):

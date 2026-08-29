@@ -1,7 +1,5 @@
-from abc import ABC, abstractmethod
 from __future__ import annotations
-from .bets_records import BetsMessage, WinnersMessage
-from .error_and_allsended import AllSendedMessage, ErrorMessage
+from abc import ABC, abstractmethod
 BETS = 0x01
 ALL_SENDED = 0x02
 WINNERS = 0x03
@@ -38,6 +36,10 @@ class Message(ABC):
 
 
 def unmarshall_message(data: bytes) -> Message:
+    # Import here to avoid circular imports at module load time
+    from .bets_records import BetsMessage, WinnersMessage
+    from .error_and_allsended import AllSendedMessage, ErrorMessage
+    
     if len(data) < HEADER_LENGTH:
         raise ValueError("Data too short to be a valid Message")
 

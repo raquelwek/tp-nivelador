@@ -1,6 +1,6 @@
 from __future__ import annotations
-from server.src.server.protocol.messages import Message, BETS, WINNERS
-from server.src_frozen.lottery import Bet
+from .messages import Message, BETS, WINNERS
+from lottery.bet import Bet
 
 LEN_BET_MIN = 16
 

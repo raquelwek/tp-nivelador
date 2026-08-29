@@ -2,8 +2,10 @@ import socket
 import logger
 import safe_socket
 
-from server.protocol.messages import HEADER_LENGTH, unmarshall_message, Message, ALL_SENDED,WinnersMessage, ErrorMessage, BETS
-from server.src_frozen.lottery import Lottery
+from server.protocol.messages import HEADER_LENGTH, unmarshall_message, Message, ALL_SENDED, BETS
+from server.protocol.bets_records import WinnersMessage
+from server.protocol.error_and_allsended import ErrorMessage
+from lottery.lottery import Lottery
 
 BETS_RECEIVED_NAME_FILE = "bets_received.csv"
 
