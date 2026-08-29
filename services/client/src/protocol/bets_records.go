@@ -52,7 +52,7 @@ type BetsPayload struct {
 	betRecordList
 }
 
-func NewBetsPayload(batchSize int) *BetsPayload {
+func createBetsPayload(batchSize int) *BetsPayload {
 	return &BetsPayload{betRecordList{BatchSize: batchSize}}
 }
 
@@ -63,6 +63,10 @@ type WinnersPayload struct {
 }
 
 func (p *WinnersPayload) Type() MessageType { return WINNERS }
+
+func createWinnersPayload(batchSize int) *WinnersPayload {
+	return &WinnersPayload{betRecordList{BatchSize: batchSize}}
+}
 
 func marshalBetRecord(bet lottery.Bet) []byte {
 	payload := make([]byte, 0)

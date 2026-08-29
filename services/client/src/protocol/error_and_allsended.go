@@ -4,6 +4,12 @@ type ErrorPayload struct {
 	Message string
 }
 
+func createErrorPayload(message string) *ErrorPayload {
+	return &ErrorPayload{
+		Message: message,
+	}
+}
+
 func (p *ErrorPayload) MarshalPayload() ([]byte, error) {
 	return []byte(p.Message), nil
 }
@@ -20,6 +26,9 @@ func (p *ErrorPayload) Type() MessageType {
 type AllSendedPayload struct {
 }
 
+func createAllSendedPayload() *AllSendedPayload {
+	return &AllSendedPayload{}
+}
 func (p *AllSendedPayload) MarshalPayload() ([]byte, error) {
 	return []byte{}, nil
 }

@@ -41,21 +41,7 @@ func (m *Message) Marshal() ([]byte, error) {
 	return append(header, payloadBytes...), nil
 }
 
-func payloadFactory(msgType MessageType) (Payload, error) {
-	switch msgType {
-	case BETS:
-		return &BetsPayload{}, nil
-	case ALL_SENDED:
-		return &AllSendedPayload{}, nil
-	case WINNERS:
-		return &WinnersPayload{}, nil
-	case ERROR:
-		return &ErrorPayload{}, nil
-	default:
-		return nil, fmt.Errorf("unknown message type: %d", msgType)
-	}
-}
-func UnmarshalMessage(data []byte) (*Message, error) {
+func UnmarshalMessage(data []byte, batchSize int) (*Message, error) {
 	if len(data) < HeaderLength {
 		return nil, fmt.Errorf("data too short to be a valid message header")
 	}
@@ -68,12 +54,20 @@ func UnmarshalMessage(data []byte) (*Message, error) {
 		return nil, fmt.Errorf("data too short for declared payload length")
 	}
 
-	newPayload, err := payloadFactory(msgType)
-	if err != nil {
-		return nil, err
+	var payload Payload
+	switch msgType {
+	case BETS:
+		payload = createBetsPayload(batchSize)
+	case ALL_SENDED:
+		payload = createAllSendedPayload()
+	case WINNERS:
+		payload = createWinnersPayload(batchSize)
+	case ERROR:
+		payload = createErrorPayload("")
+	default:
+		return nil, fmt.Errorf("unknown message type: %v", msgType)
 	}
 
-	payload := newPayload()
 	rawPayload := data[HeaderLength : HeaderLength+payloadLength]
 	if err := payload.UnmarshalPayload(rawPayload); err != nil {
 		return nil, err
