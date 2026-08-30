@@ -1,6 +1,8 @@
 import socket
 import logger
 import safe_socket
+import threading
+import time
 import os
 
 from server.protocol.messages import HEADER_LENGTH, unmarshall_message, Message, ALL_SENDED, BETS
@@ -46,13 +48,21 @@ class Server:
                     self.handle_bets_message(client_message)
 
         except Exception as e:
-            logger.error(action, logger.LogResult.fail, "error", str(e))            
+            logger.error(action, logger.LogResult.fail, "error", str(e))
+        finally:
+            client_socket.close()
+            logger.info(action, logger.LogResult.success, "messages-amount", message_amount)
+                     
 
     def run(self):
+        action = "run-server"
+        logger.info(action, logger.LogResult.in_progress, "host", self.server_host, "port", self.server_port)
         action = "accept-connection"
+        threads = []
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
             server_socket.bind((self.server_host, self.server_port))
             server_socket.listen()
+
             while True:
                 try:
                     logger.info(action, logger.LogResult.in_progress)
@@ -60,8 +70,17 @@ class Server:
                 except Exception as e:
                     logger.error(action, logger.LogResult.fail)
                     raise e
+                
                 logger.info(action, logger.LogResult.success)
-                self._handle_client(client_socket)
+
+                thread = threading.Thread(target=self._handle_client, args=(client_socket,))
+                thread.start()
+                threads.append((client_socket, thread))
+
+
+        for client_socket, thread in threads:
+            client_socket.close()
+            thread.join()
 
     def recv_message(self, client_socket:socket.socket) -> Message:
         action = "recv-message"
