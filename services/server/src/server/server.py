@@ -10,7 +10,7 @@ from lottery.lottery import Lottery
 from safe_socket.safe_socket import recv_all, send_all
 
 BETS_RECEIVED_NAME_FILE = "bets_received.csv"
-
+AGENCY_ID = 1
 class Server:
     def __init__(self, server_host: str, server_port: int) -> None:
         self.server_host = server_host
@@ -29,20 +29,12 @@ class Server:
         try:
             logger.info(action, logger.LogResult.in_progress)
             while True:
-                logger.info("LLO", logger.LogResult.in_progress, "waiting", "message")
                 client_message = self.recv_message(client_socket)
                 if agency_id is None:
                     agency_id = client_message.agency_id
-                logger.info(action, logger.LogResult.in_progress, "received", "message", str(client_message))
-                
-                if not client_message:
-                    logger.info(
-                        action,
-                        logger.LogResult.success,
-                        "messages-amount",
-                        message_amount,
-                    )
-                    return
+
+                logger.info(action, logger.LogResult.in_progress, "received", "message", str(client_message), "messages-amount",
+                                        message_amount,)
                 message_amount += 1
 
                 if client_message.type == ALL_SENDED:  
@@ -53,9 +45,6 @@ class Server:
                 
                 elif client_message.type == BETS:
                     self.handle_bets_message(client_message)
-
-                else:
-                    logger.error(action, logger.LogResult.fail, "unknown message type", client_message.type)
 
         except Exception as e:
             logger.error(action, logger.LogResult.fail, "error", str(e))            
@@ -102,7 +91,7 @@ class Server:
 
     def getWinnersMessage(self) -> Message:
         action = "get-winners"
-        winners_message = WinnersMessage(0)
+        winners_message = WinnersMessage(AGENCY_ID)
         winners = 0
         for bet in self.lottery.load_bets():
             if not self.lottery.has_won(bet):
