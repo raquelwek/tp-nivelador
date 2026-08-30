@@ -32,7 +32,8 @@ const baseClient = `
       - SERVER_HOST=server
       - SERVER_PORT=5678
       - INPUT_FILE=/input/input-0.csv 
-      - OUTPUT_FILE=/output/prueba.txt 
+      - OUTPUT_FILE=/output/prueba.txt
+      - BATCH_SIZE=4
     depends_on:
       - server
     volumes:

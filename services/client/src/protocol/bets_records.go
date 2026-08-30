@@ -16,7 +16,7 @@ type betRecordList struct {
 
 func (b *betRecordList) AddBet(bet lottery.Bet) error {
 	if len(b.Records) >= b.batchSize {
-		return fmt.Errorf("cannot add bet: batch is full (max %d)", b.batchSize)
+		return fmt.Errorf("cannot add bet: batch is full")
 	}
 	b.Records = append(b.Records, bet)
 	return nil

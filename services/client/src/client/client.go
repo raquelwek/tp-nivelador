@@ -15,7 +15,6 @@ import (
 const CONNECTION_ATTEMPTS_MAX = 3
 const CONNECTION_ATTEMPS_DELAY_MS = 200
 
-const BATCH_SIZE = 512
 const ECHO_CLIENT_MESSAGE_AMOUNT = 3
 const ECHO_CLIENT_MESSAGE_DELAY_MS = 1000
 
@@ -27,6 +26,7 @@ type ClientConfig struct {
 	AgencyId   string
 	InputFile  string
 	OutputFile string
+	BatchSize  int
 }
 
 type Client struct {
@@ -82,11 +82,13 @@ func (client *Client) Run() error {
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId, "bets-read", len(agencyBets))
 
-	payload := protocol.CreateBetsPayload(BATCH_SIZE)
+	messageBetsAmount := 0
+	payload := protocol.CreateBetsPayload(client.config.BatchSize)
 	for _, bet := range agencyBets {
 		err1 := payload.AddBet(bet)
 		logger.Info(mainAction, logger.InProgress, "agency-id", client.config.AgencyId, "bet added", bet)
 		if err1 != nil && err1.Error() == "cannot add bet: batch is full" {
+
 			// Envía el payload lleno
 			message := protocol.CreateMessage(byte(agencyId), payload)
 			err = client.send(message)
@@ -94,8 +96,9 @@ func (client *Client) Run() error {
 				logger.Error(mainAction, logger.Fail, "err", err)
 				return err
 			}
+			messageBetsAmount++
 			// Crea nuevo payload y agrega la apuesta que causó el error
-			payload = protocol.CreateBetsPayload(BATCH_SIZE)
+			payload = protocol.CreateBetsPayload(client.config.BatchSize)
 			err1 = payload.AddBet(bet)
 			if err1 != nil {
 				logger.Error(mainAction, logger.Fail, "err", err1)
@@ -110,6 +113,8 @@ func (client *Client) Run() error {
 		logger.Error(mainAction, logger.Fail, "err", err)
 		return err
 	}
+	messageBetsAmount++
+	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId, "messages-bets-sent", messageBetsAmount)
 	allSended := protocol.CreateMessage(byte(agencyId), protocol.CreateAllSendedPayload())
 	sendErr := client.send(allSended)
 	if sendErr != nil {
@@ -172,7 +177,7 @@ func (client *Client) receive(mainAction string) (protocol.Message, error) {
 		logger.Error("receive-message", logger.Fail, messageArgs...)
 		return nil, err
 	}
-	message, err := protocol.UnmarshalMessage(append(bytes_header, bytes_payload...), BATCH_SIZE)
+	message, err := protocol.UnmarshalMessage(append(bytes_header, bytes_payload...), client.config.BatchSize)
 	if err != nil {
 		logger.Error("unmarshal-message", logger.Fail, messageArgs...)
 		return nil, err
