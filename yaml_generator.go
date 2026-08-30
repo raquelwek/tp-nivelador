@@ -31,7 +31,7 @@ const baseClient = `
       - AGENCY_ID=%d
       - SERVER_HOST=server
       - SERVER_PORT=5678
-      - INPUT_FILE=/input/input-0.csv 
+      - INPUT_FILE=/input/input-%d.csv 
       - OUTPUT_FILE=/output/output-%d.csv
       - BATCH_SIZE=4
     depends_on:
@@ -44,7 +44,7 @@ const baseClient = `
 func buildClients(clientAmount int) string {
 	clients := ""
 	for i := 1; i <= clientAmount; i++ {
-		clients += fmt.Sprintf(baseClient, i, i, i, i)
+		clients += fmt.Sprintf(baseClient, i, i, i, i, i)
 	}
 	return clients
 }
