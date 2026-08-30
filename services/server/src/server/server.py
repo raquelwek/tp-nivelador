@@ -10,7 +10,7 @@ from lottery.lottery import Lottery
 from safe_socket.safe_socket import recv_all, send_all
 
 BETS_RECEIVED_NAME_FILE = "bets_received.csv"
-AGENCY_ID = 1
+
 class Server:
     def __init__(self, server_host: str, server_port: int) -> None:
         self.server_host = server_host
@@ -24,14 +24,13 @@ class Server:
     def _handle_client(self, client_socket):
         action = "handle-client"
         message_amount = 0
-        agency_id = None
-        client_message = None
+
         try:
             logger.info(action, logger.LogResult.in_progress)
             while True:
                 client_message = self.recv_message(client_socket)
-                if agency_id is None:
-                    agency_id = client_message.agency_id
+
+                agency_id = client_message.agency_id
 
                 logger.info(action, logger.LogResult.in_progress, "received", "message", str(client_message), "messages-amount",
                                         message_amount,)
@@ -39,7 +38,7 @@ class Server:
 
                 if client_message.type == ALL_SENDED:  
                     # @TO DO: Manage concurrency to wait until AGENCY_QUORUM_MIN is reached
-                    winners_message = self.getWinnersMessage()
+                    winners_message = self.getWinnersMessage(agency_id)
                     self.send_message(client_socket, winners_message)
                     return 
                 
@@ -89,12 +88,15 @@ class Server:
         self.lottery.store_bets(message.bets)
         logger.info(action, logger.LogResult.success, "bets-count", len(message.bets))
 
-    def getWinnersMessage(self) -> Message:
+    '''
+    Returns a Winners message with all the winners of the agency_id passed as parameter. If there are no winners, it returns an empty Winners message.
+    '''
+    def getWinnersMessage(self, agency_id: int) -> Message:
         action = "get-winners"
-        winners_message = WinnersMessage(AGENCY_ID)
+        winners_message = WinnersMessage(agency_id)
         winners = 0
         for bet in self.lottery.load_bets():
-            if not self.lottery.has_won(bet):
+            if not self.lottery.has_won(bet) or bet.agency_id != agency_id:
                 continue
             winners_message.add_bet(bet)
             winners += 1
