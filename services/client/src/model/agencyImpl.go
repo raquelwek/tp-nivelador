@@ -67,12 +67,15 @@ func (a *AgencyImpl) StoreWinner(winningBets []Bet) error {
 	defer writer.Flush()
 
 	for _, bet := range winningBets {
+		birthdate := bet.Birthdate
+		if len(birthdate) == 8 {
+			birthdate = birthdate[0:4] + "-" + birthdate[4:6] + "-" + birthdate[6:8]
+		}
 		row := []string{
-			strconv.Itoa(bet.AgencyId),
 			bet.FirstName,
 			bet.LastName,
 			strconv.Itoa(bet.Document),
-			bet.Birthdate,
+			birthdate,
 			strconv.Itoa(bet.Number),
 		}
 

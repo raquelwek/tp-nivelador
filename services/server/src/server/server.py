@@ -33,7 +33,7 @@ class Server:
                 agency_id = client_message.agency_id
 
                 logger.info(action, logger.LogResult.in_progress, "received", "message", str(client_message), "messages-amount",
-                                        message_amount,)
+                                        message_amount, "agency-id", agency_id)
                 message_amount += 1
 
                 if client_message.type == ALL_SENDED:  
@@ -96,7 +96,7 @@ class Server:
         winners_message = WinnersMessage(agency_id)
         winners = 0
         for bet in self.lottery.load_bets():
-            if not self.lottery.has_won(bet) or bet.agency_id != agency_id:
+            if not (self.lottery.has_won(bet) and bet.agency_id == agency_id):
                 continue
             winners_message.add_bet(bet)
             winners += 1

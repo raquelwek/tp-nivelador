@@ -12,7 +12,7 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
-const CONNECTION_ATTEMPTS_MAX = 3
+const CONNECTION_ATTEMPTS_MAX = 10
 const CONNECTION_ATTEMPS_DELAY_MS = 200
 
 const ECHO_CLIENT_MESSAGE_AMOUNT = 3
