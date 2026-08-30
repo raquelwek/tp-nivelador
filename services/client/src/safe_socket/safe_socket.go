@@ -17,5 +17,8 @@ func SendAll(socket io.Writer, bytes []byte) error {
 func RecvAll(socket io.Reader, size int) ([]byte, error) {
 	buff := make([]byte, size)
 	_, err := io.ReadFull(socket, buff)
-	return buff, err
+	if err != nil {
+		return nil, err
+	}
+	return buff, nil
 }

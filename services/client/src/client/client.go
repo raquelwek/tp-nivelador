@@ -80,22 +80,38 @@ func (client *Client) Run() error {
 		logger.Error(mainAction, logger.Fail, "err", err)
 		return err
 	}
+	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId, "bets-read", len(agencyBets))
+
 	payload := protocol.CreateBetsPayload(BATCH_SIZE)
 	for _, bet := range agencyBets {
-		err := payload.AddBet(bet)
-		if err.Error() == "cannot add bet: batch is full" {
+		err1 := payload.AddBet(bet)
+		logger.Info(mainAction, logger.InProgress, "agency-id", client.config.AgencyId, "bet added", bet)
+		if err1 != nil && err1.Error() == "cannot add bet: batch is full" {
+			// Envía el payload lleno
 			message := protocol.CreateMessage(byte(agencyId), payload)
-			client.send(message, mainAction)
-			err = client.send(message, mainAction)
+			err = client.send(message)
 			if err != nil {
 				logger.Error(mainAction, logger.Fail, "err", err)
 				return err
 			}
+			// Crea nuevo payload y agrega la apuesta que causó el error
 			payload = protocol.CreateBetsPayload(BATCH_SIZE)
+			err1 = payload.AddBet(bet)
+			if err1 != nil {
+				logger.Error(mainAction, logger.Fail, "err", err1)
+				return err1
+			}
 		}
 	}
+	// Envía lo que quedó en el payload
+	message := protocol.CreateMessage(byte(agencyId), payload)
+	err = client.send(message)
+	if err != nil {
+		logger.Error(mainAction, logger.Fail, "err", err)
+		return err
+	}
 	allSended := protocol.CreateMessage(byte(agencyId), protocol.CreateAllSendedPayload())
-	sendErr := client.send(allSended, mainAction)
+	sendErr := client.send(allSended)
 	if sendErr != nil {
 		logger.Error(mainAction, logger.Fail, "err", sendErr)
 		return sendErr
@@ -121,8 +137,9 @@ func (client *Client) Run() error {
 	return nil
 }
 
-func (client *Client) send(message protocol.Message, mainAction string) error {
-	messageArgs := []any{"agency-id", client.config.AgencyId}
+func (client *Client) send(message protocol.Message) error {
+	mainAction := "send-message"
+	messageArgs := []any{"agency-id", client.config.AgencyId, "message-type", message.GetPayload().Type()}
 	logger.Info(mainAction, logger.InProgress, messageArgs...)
 
 	bytes, err := message.Marshal()
@@ -131,11 +148,12 @@ func (client *Client) send(message protocol.Message, mainAction string) error {
 		return err
 	}
 
+	logger.Info(mainAction, logger.InProgress, append(messageArgs, "bytes-count", len(bytes))...)
 	if err := safe_socket.SendAll(client.conn, bytes); err != nil {
 		logger.Error("send-message", logger.Fail, messageArgs...)
 		return err
 	}
-
+	logger.Info(mainAction, logger.Success, messageArgs...)
 	return nil
 }
 
@@ -144,6 +162,10 @@ func (client *Client) receive(mainAction string) (protocol.Message, error) {
 	logger.Info(mainAction, logger.InProgress, messageArgs...)
 
 	bytes_header, err := safe_socket.RecvAll(client.conn, protocol.HeaderLength)
+	if err != nil {
+		logger.Error("receive-message", logger.Fail, messageArgs...)
+		return nil, err
+	}
 	payloadLength := (int)(binary.BigEndian.Uint32(bytes_header[2:6]))
 	bytes_payload, err := safe_socket.RecvAll(client.conn, payloadLength)
 	if err != nil {

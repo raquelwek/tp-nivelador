@@ -1,11 +1,13 @@
 import socket
 import logger
 import safe_socket
+import os
 
 from server.protocol.messages import HEADER_LENGTH, unmarshall_message, Message, ALL_SENDED, BETS
 from server.protocol.bets_records import WinnersMessage
 from server.protocol.error_and_allsended import ErrorMessage
 from lottery.lottery import Lottery
+from safe_socket.safe_socket import recv_all, send_all
 
 BETS_RECEIVED_NAME_FILE = "bets_received.csv"
 
@@ -13,19 +15,25 @@ class Server:
     def __init__(self, server_host: str, server_port: int) -> None:
         self.server_host = server_host
         self.server_port = server_port
+        # Crear el archivo si no existe
+        if not os.path.exists(BETS_RECEIVED_NAME_FILE):
+            with open(BETS_RECEIVED_NAME_FILE, "w") as file:
+                pass  # Crear archivo vacío
         self.lottery = Lottery(BETS_RECEIVED_NAME_FILE)
 
     def _handle_client(self, client_socket):
         action = "handle-client"
         message_amount = 0
         agency_id = None
+        client_message = None
         try:
             logger.info(action, logger.LogResult.in_progress)
             while True:
+                logger.info("LLO", logger.LogResult.in_progress, "waiting", "message")
                 client_message = self.recv_message(client_socket)
                 if agency_id is None:
                     agency_id = client_message.agency_id
-
+                logger.info(action, logger.LogResult.in_progress, "received", "message", str(client_message))
                 
                 if not client_message:
                     logger.info(
@@ -46,10 +54,11 @@ class Server:
                 elif client_message.type == BETS:
                     self.handle_bets_message(client_message)
 
+                else:
+                    logger.error(action, logger.LogResult.fail, "unknown message type", client_message.type)
+
         except Exception as e:
-            logger.error(action, logger.LogResult.fail)
-            self.send_message(client_socket, ErrorMessage(client_message.agency_id, str(e)))
-                    
+            logger.error(action, logger.LogResult.fail, "error", str(e))            
 
     def run(self):
         action = "accept-connection"
@@ -64,14 +73,17 @@ class Server:
                     logger.error(action, logger.LogResult.fail)
                     raise e
                 logger.info(action, logger.LogResult.success)
-
                 self._handle_client(client_socket)
 
-    def recv_message(self, client_socket: socket.socket) -> Message:
+    def recv_message(self, client_socket:socket.socket) -> Message:
         action = "recv-message"
-        header_bytes = client_socket.recv_all(HEADER_LENGTH)
+        logger.info(action, logger.LogResult.in_progress, "waiting", "header")
+        header_bytes = recv_all(client_socket, HEADER_LENGTH)
+        logger.info(action, logger.LogResult.in_progress, "received", "header", "bytes", len(header_bytes))
         payload_length = int.from_bytes(header_bytes[2:6], byteorder='big')
-        payload_bytes = client_socket.recv_all(payload_length)
+        logger.info(action, logger.LogResult.in_progress, "waiting", "payload", "length", payload_length)
+        payload_bytes = recv_all(client_socket, payload_length)
+        logger.info(action, logger.LogResult.in_progress, "received", "payload", "bytes", len(payload_bytes))
         message_bytes = header_bytes + payload_bytes
         message = unmarshall_message(message_bytes)
         logger.info(action, logger.LogResult.success, "message", str(message))
@@ -80,7 +92,7 @@ class Server:
     def send_message(self, client_socket: socket.socket, message: Message):
         action = "send-message"
         message_bytes = message.marshall()
-        client_socket.send_all(message_bytes)
+        send_all(client_socket, message_bytes)
         logger.info(action, logger.LogResult.success, "message", str(message))
 
     def handle_bets_message(self, message: Message):

@@ -13,7 +13,7 @@ class BetsMessage(Message):
 
     def add_bet(self, bet):
         if len(self.bets) >= self.batch_size:
-            raise ValueError("Cannot add bet: batch is full")
+            raise ValueError("cannot add bet: batch is full")
         self.bets.append(bet)
 
     def _marshall_payload(self) -> bytes:
@@ -21,7 +21,7 @@ class BetsMessage(Message):
         for bet in self.bets:
             payload += bet.document.to_bytes(4, byteorder='big')
             payload += bet.number.to_bytes(2, byteorder='big')
-            name_bytes = bet.name.encode('utf-8')
+            name_bytes = bet.first_name.encode('utf-8')
             last_name_bytes = bet.last_name.encode('utf-8')
             payload += len(name_bytes).to_bytes(1, byteorder='big')
             payload += len(last_name_bytes).to_bytes(1, byteorder='big')

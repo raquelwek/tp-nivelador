@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type AgencyImpl struct {
@@ -30,26 +31,27 @@ func (a *AgencyImpl) GetBets() ([]Bet, error) {
 
 	reader := csv.NewReader(file)
 	var bets []Bet
-	number := 0
-	for row, err := reader.Read(); err == nil; row, err = reader.Read() {
-		name, lastName, document, birthdate := row[1], row[2], row[3], row[4]
 
-		num, err := strconv.Atoi(document)
+	for row, err := reader.Read(); err == nil; row, err = reader.Read() {
+		name, lastName, document, birthdate, number := row[0], row[1], row[2], row[3], row[4]
+
+		doc, err := strconv.Atoi(document)
+		num, err := strconv.Atoi(number)
 		if err != nil {
 			return nil, fmt.Errorf("error converting string to int: %v", err)
 		}
+		birthdate = strings.ReplaceAll(birthdate, "-", "")
 
 		bet := Bet{
 			AgencyId:  a.Id,
 			FirstName: name,
 			LastName:  lastName,
-			Document:  num,
+			Document:  doc,
 			Birthdate: birthdate,
-			Number:    number,
+			Number:    num,
 		}
 
 		bets = append(bets, bet)
-		number++
 	}
 	return bets, nil
 }
