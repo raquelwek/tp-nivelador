@@ -122,7 +122,7 @@ func (client *Client) Run() error {
 		return sendErr
 	}
 
-	winners, err := client.receive(mainAction)
+	winners, err := client.receive()
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,8 @@ func (client *Client) send(message protocol.Message) error {
 	return nil
 }
 
-func (client *Client) receive(mainAction string) (protocol.Message, error) {
+func (client *Client) receive() (protocol.Message, error) {
+	mainAction := "receive-message"
 	messageArgs := []any{"agency-id", client.config.AgencyId}
 	logger.Info(mainAction, logger.InProgress, messageArgs...)
 
@@ -182,7 +183,7 @@ func (client *Client) receive(mainAction string) (protocol.Message, error) {
 		logger.Error("unmarshal-message", logger.Fail, messageArgs...)
 		return nil, err
 	}
-
+	messageArgs = append(messageArgs, "message-type", message.GetPayload().Type().String(), "payload-length", payloadLength)
 	logger.Info(mainAction, logger.Success, messageArgs...)
 	return message, nil
 
