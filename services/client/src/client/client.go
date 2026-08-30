@@ -144,7 +144,7 @@ func (client *Client) Run() error {
 
 func (client *Client) send(message protocol.Message) error {
 	mainAction := "send-message"
-	messageArgs := []any{"agency-id", client.config.AgencyId, "message-type", message.GetPayload().Type()}
+	messageArgs := []any{"agency-id", client.config.AgencyId, "message-type", message.GetPayload().Type().String()}
 	logger.Info(mainAction, logger.InProgress, messageArgs...)
 
 	bytes, err := message.Marshal()

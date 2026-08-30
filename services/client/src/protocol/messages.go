@@ -16,6 +16,22 @@ const (
 
 const HeaderLength = 6
 
+// String retorna el nombre descriptivo del tipo de mensaje
+func (mt MessageType) String() string {
+	switch mt {
+	case BETS:
+		return "BETS"
+	case ALL_SENDED:
+		return "ALL_SENDED"
+	case WINNERS:
+		return "WINNERS"
+	case ERROR:
+		return "ERROR"
+	default:
+		return fmt.Sprintf("UNKNOWN(%d)", mt)
+	}
+}
+
 type Payload interface {
 	MarshalPayload() ([]byte, error)
 	UnmarshalPayload([]byte) error
