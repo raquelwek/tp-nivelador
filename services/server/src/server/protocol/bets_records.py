@@ -6,8 +6,8 @@ LEN_BET_MIN = 16
 
 
 class BetsMessage(Message):
+    type = BETS
     def __init__(self, agency_id: int, batch_size: int = 1024):
-        self.type = BETS
         super().__init__(agency_id, batch_size)
         self.bets = []
 

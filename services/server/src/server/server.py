@@ -47,7 +47,7 @@ class Server:
 
                 if client_message.type == ALL_SENDED:  
                     # @TO DO: Manage concurrency to wait until AGENCY_QUORUM_MIN is reached
-                    winners_message = self.getWinners()
+                    winners_message = self.getWinnersMessage()
                     self.send_message(client_socket, winners_message)
                     return 
                 
@@ -100,7 +100,7 @@ class Server:
         self.lottery.store_bets(message.bets)
         logger.info(action, logger.LogResult.success, "bets-count", len(message.bets))
 
-    def getWinners(self) -> WinnersMessage:
+    def getWinnersMessage(self) -> Message:
         action = "get-winners"
         winners_message = WinnersMessage(0)
         winners = 0
