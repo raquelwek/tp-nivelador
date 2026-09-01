@@ -68,9 +68,9 @@ func (a *AgencyImpl) StoreWinner(winningBets []Bet) error {
 
 	for _, bet := range winningBets {
 		birthdate := bet.Birthdate
-		if len(birthdate) == 8 {
-			birthdate = birthdate[0:4] + "-" + birthdate[4:6] + "-" + birthdate[6:8]
-		}
+
+		birthdate = birthdate[0:4] + "-" + birthdate[4:6] + "-" + birthdate[6:8]
+
 		row := []string{
 			bet.FirstName,
 			bet.LastName,

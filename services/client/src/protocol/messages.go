@@ -12,6 +12,7 @@ const (
 	ALL_SENDED MessageType = 0x02
 	WINNERS    MessageType = 0x03
 	ERROR      MessageType = 0x04
+	ACK        MessageType = 0x05
 )
 
 const HeaderLength = 6
@@ -27,6 +28,8 @@ func (mt MessageType) String() string {
 		return "WINNERS"
 	case ERROR:
 		return "ERROR"
+	case ACK:
+		return "ACK"
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", mt)
 	}
@@ -95,6 +98,8 @@ func UnmarshalMessage(data []byte, batchSize int) (Message, error) {
 		payload = CreateWinnersPayload(batchSize)
 	case ERROR:
 		payload = CreateErrorPayload("")
+	case ACK:
+		payload = CreateAckPayload()
 	default:
 		return nil, fmt.Errorf("unknown message type: %v", msgType)
 	}
