@@ -14,6 +14,7 @@ from safe_socket.safe_socket import recv_all, send_all
 
 BETS_RECEIVED_NAME_FILE = "bets_received.csv"
 SOCKET_TIMEOUT_ACCEPT = 1.0
+SHUTDOWN_GRACE_PERIOD = 5.0
 
 class Server:
     def __init__(self, server_host: str, server_port: int) -> None:
@@ -26,7 +27,7 @@ class Server:
         # Crear el archivo si no existe
         if not os.path.exists(BETS_RECEIVED_NAME_FILE):
             with open(BETS_RECEIVED_NAME_FILE, "w") as _:
-                pass  # Crear archivo vacío
+                pass 
 
         self.lottery = Lottery(BETS_RECEIVED_NAME_FILE)
 
@@ -77,21 +78,37 @@ class Server:
                     client_socket, _ = server_socket.accept()
                 except socket.timeout:
                     continue
-
                 except Exception as e:
-                    logger.error(action, logger.LogResult.fail)
+                    logger.error(action, logger.LogResult.fail, "error", str(e))
                     break
                 
                 logger.info(action, logger.LogResult.success)
-
                 thread = threading.Thread(target=self._handle_client, args=(client_socket,))
                 thread.start()
-                threads.append(thread)
+                threads.append((client_socket,thread))
 
 
-        for thread in threads:
-            thread.join()
+        self._graceful_shutdown(threads)
         logger.info("shutdown", logger.LogResult.success)
+
+    def _graceful_shutdown(self, threads):
+        action = "shutdown"
+        deadline = time.monotonic() + SHUTDOWN_GRACE_PERIOD
+
+        # fase polite
+        for client_socket, thread in threads:
+            remaining = deadline - time.monotonic()
+            thread.join(timeout=max(0, remaining))
+
+        # fase forzada: revisar si esto es necesario, idem con timer
+        for client_socket, thread in threads:
+            if thread.is_alive():
+                logger.info(action, logger.LogResult.in_progress, "force-closing-stuck-client")
+                try:
+                    client_socket.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                thread.join()
 
     def recv_message(self, client_socket:socket.socket) -> Message:
         action = "recv-message"
@@ -121,6 +138,7 @@ class Server:
     '''
     Returns a Winners message with all the winners of the agency_id passed as parameter. If there are no winners, it returns an empty Winners message.
     '''
+    # @ TODO: MAnage concurrency with shared file 
     def getWinnersMessage(self, agency_id: int) -> Message:
         action = "get-winners"
         winners_message = WinnersMessage(agency_id)
