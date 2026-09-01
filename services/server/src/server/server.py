@@ -17,9 +17,11 @@ SOCKET_TIMEOUT_ACCEPT = 1.0
 SHUTDOWN_GRACE_PERIOD = 5.0
 
 class Server:
-    def __init__(self, server_host: str, server_port: int) -> None:
+    def __init__(self, server_host: str, server_port: int, agency_quorum_min: int) -> None:
         self.server_host = server_host
         self.server_port = server_port
+        self.agency_quorum_min = agency_quorum_min
+
         # for graceful shutdown
         self._running = True
         signal.signal(signal.SIGTERM, self._handle_shutdown)
