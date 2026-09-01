@@ -24,7 +24,7 @@ func (b *betRecordList) AddBet(bet lottery.Bet) error {
 
 func (b *betRecordList) MarshalPayload() ([]byte, error) {
 	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, uint16(len(b.Records))) //@TO DO; check if its useful xd
+	binary.BigEndian.PutUint16(buf, uint16(len(b.Records)))
 
 	for _, bet := range b.Records {
 		record := marshalBetRecord(bet)
@@ -44,6 +44,9 @@ func (p *betRecordList) UnmarshalPayload(data []byte) error {
 		bet, new_offset := UnmarshalBetRecord(offset, data)
 		p.Records = append(p.Records, bet)
 		offset = new_offset
+	}
+	if len(p.Records) != int(count) {
+		return fmt.Errorf("bets count mismatch: expected %d, got %d", count, len(p.Records))
 	}
 	return nil
 }
@@ -133,6 +136,5 @@ func UnmarshalBetRecord(offset int, payload []byte) (lottery.Bet, int) {
 		Birthdate: birthdate,
 		Number:    number,
 	}
-
 	return bet, offset
 }

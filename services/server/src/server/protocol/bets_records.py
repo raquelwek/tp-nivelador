@@ -46,6 +46,9 @@ class BetsMessage(Message):
 
             bet = Bet(agency_id, name, last_name, document, birthdate, number)
             msg.bets.append(bet)  # ojo: append directo, NO add_bet (ver nota abajo)
+
+        if bets_count != len(msg.bets):
+            raise ValueError("bets count mismatch: expected {}, got {}".format(bets_count, len(msg.bets)))
         return msg
 
 class WinnersMessage(BetsMessage):

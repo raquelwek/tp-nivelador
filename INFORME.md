@@ -86,8 +86,7 @@ Luego, para hacer posible el envío de varios registros de apuestas en un solo m
 ```
 
 ### `WINNERS` payload
-Análogo al mensaje BETS, solo que en este caso el payload contendrá los registros de apuestas ganadoras, con la misma estructura de registro de apuesta definida anteriormente.
-
+Análogo al mensaje BETS, solo que en este caso el payload contendrá los registros de apuestas ganadoras, con la misma estructura de registro de apuesta definida anteriormente, solo que en este caso no hay límite de batch?
 
 ### `ERROR` payload
 
@@ -98,15 +97,17 @@ Análogo al mensaje BETS, solo que en este caso el payload contendrá los regist
 ```
 - `Message (variable)`: Contiene un mensaje de error descriptivo en formato UTF-8.
 
-### `ALL_SENDED` payload
-El mensaje `ALL_SENDED` no contiene payload, ya que su función es únicamente indicar que el cliente ha terminado de enviar todos los registros de apuestas.
-
+### `ALL_SENDED` y `ACK` payload 
+Por un lado, el mensaje `ALL_SENDED` no contiene payload, ya que su función es únicamente indicar que el cliente ha terminado de enviar todos los registros de apuestas.
+Mientras que, el mensaje `ACK` no contiene payload, ya que su función es únicamente indicar que el cliente ha recibido correctamente un mensaje del servidor 
+para sincronizar las tasas de envío y recepción de mensajes entre el cliente y el servidor, es decir que el cliente puede enviar un nuevo mensaje hasta que haya recibido un ACK del servidor, y viceversa.
 
 ## Implementación
 
 Partiendo de las clases en `services/server/src_frozen` que establecen el modelo de dominio de la aplicación, se implementaron clases análogas para el cliente en Go.
-Lo que se buscaba es que la aplicación se abstraiga de la serialización y deserialización de los mensajes, para que el cliente pueda enviar y recibir mensajes de manera sencilla, sin preocuparse por los detalles del protocolo, 
-es por eso que conectamos las clases que simbolizaban los mensajes con las clases que representaban el modelo de dominio, de manera que el cliente pueda enviar y recibir mensajes de manera sencilla.
+Lo que se buscaba es que la aplicación se abstraiga de la serialización y deserialización de los mensajes, para que el cliente pueda enviar y recibir mensajes de manera sencilla, 
+es por eso que conectamos las clases que simbolizaban los mensajes con las clases que representaban el modelo de dominio, de manera que el cliente pueda enviar y recibir mensajes sin
+tener que serializar o deserializarlos manualmente.
 
 Ejemplo de métodos que se usan para serializar y deserializar los mensajes, sin importar su tipo.
 
@@ -115,12 +116,12 @@ marshall() -> bytes
 unmarshall(data: bytes) -> Message
 ```
 
-Si bien estos mismos no utilizan la clase `Bet`explícitamente, en el caso de que sea un mensaje de tipo `BETS` o `WINNERS`, el payload contendrá registros de apuestas, por lo que se implementaron métodos para convertir entre la clase `Bet` y la estructura de registro de apuesta definida en el protocolo.
-
+Si bien estos mismos no utilizan la clase `Bet`explícitamente, en el caso de que sea un mensaje de tipo `BETS` o `WINNERS`, el payload contendrá registros de apuestas, por lo que se implementaron métodos para  convertir la clase `Bet` a la estructura de registro de apuesta definida en el protocolo que se serializa en el payload, y viceversa.
+Esto es posible mediante la abstracción del mensaje `BetMessage` que tiene como atributo una lista de apuestas que se pueden agregar mediante el método `add_bet`, y que luego se serializa en el payload del mensaje.
 ```python
 '''
 Agrega un registro de apuesta que se usará para serializar y enviar en un mensaje de tipo `BETS` o `WINNERS`.
-Verifica que no se agreguen más de los que deberían entrar en un batch.
+Verifica que no se agreguen más de los que deberían entrar en un batch, si es que existe esta limitación.
 '''
 add_bet(bet: Bet) -> None
 ```
