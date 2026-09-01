@@ -4,6 +4,7 @@ BETS = 0x01
 ALL_SENDED = 0x02
 WINNERS = 0x03
 ERROR = 0x04
+ACK = 0x05
 
 HEADER_LENGTH = 6  # bytes
 
@@ -38,7 +39,7 @@ class Message(ABC):
 def unmarshall_message(data: bytes) -> Message:
     # Import here to avoid circular imports at module load time
     from .bets_records import BetsMessage, WinnersMessage
-    from .error_and_allsended import AllSendedMessage, ErrorMessage
+    from .simple_messages import AllSendedMessage, ErrorMessage, AckMessage
     
     if len(data) < HEADER_LENGTH:
         raise ValueError("Data too short to be a valid Message")
@@ -60,5 +61,7 @@ def unmarshall_message(data: bytes) -> Message:
         return WinnersMessage._unmarshall_payload(agency_id, payload)
     elif type_id == ERROR:
         return ErrorMessage._unmarshall_payload(agency_id, payload)
+    elif type_id == ACK:
+        return AckMessage._unmarshall_payload(agency_id, payload)
     else:
         raise ValueError(f"Unknown message type: {type_id}")

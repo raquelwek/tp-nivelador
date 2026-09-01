@@ -8,7 +8,7 @@ import signal
 
 from server.protocol.messages import HEADER_LENGTH, unmarshall_message, Message, ALL_SENDED, BETS
 from server.protocol.bets_records import WinnersMessage
-from server.protocol.error_and_allsended import ErrorMessage
+from services.server.src.server.protocol.simple_messages import ErrorMessage, AckMessage
 from lottery.lottery import Lottery
 from safe_socket.safe_socket import recv_all, send_all
 from server.rw_lock import RWLock
