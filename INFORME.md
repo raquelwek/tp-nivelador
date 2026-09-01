@@ -69,7 +69,7 @@ Luego, para hacer posible el envío de varios registros de apuestas en un solo m
 ```
 
 - `Bet Count (2B)`: Indica la cantidad de registros de apuestas incluidos en el mensaje.
-- `Bet Record (variable)`: Cada registro de apuesta tiene una estructura definida que incluye la información de la misma, de la siguiente manerA:
+- `Bet Record (variable)`: Cada registro de apuesta tiene una estructura definida que incluye la información de la misma, de la siguiente manera:
 
 ```
 +----------------+----------------+----------------+----------------+
@@ -125,3 +125,30 @@ Verifica que no se agreguen más de los que deberían entrar en un batch.
 add_bet(bet: Bet) -> None
 ```
 
+# Manejo de concurrencia
+El servidor soporta múlltiples clientes concurrentes, cada uno se maneja en su propio hilo por la función `handle_client`.
+
+Para que sea seguro que no hayan **race conditions**, se implementó un mecanismo de sincronización para acceder al archivo de apuestas recibidas, que en este se crea con el nombre `bets_received.csv`
+
+## Acceso al archivo de apuestas recibidas
+
+Dado a que el servidor tiene dos operaciones principales sobre el recurso compartido que son de lectura y escritura, 
+se implementó un mecanismo de sincronización que permite que múltiples hilos puedan leer el recurso compartido de manera concurrente, pero solo un hilo pueda escribir en él a la vez, y mientras se está escribiendo, ningún otro hilo puede leerlo ni escribirlo.
+
+El mecanismo conocido como Read Write Lock, se implementó en la clase `RWLock` que se encuentra [en este link](services/server/src/server/rw_lock.py), y a grandes rasgos logra lo antes mencionado mediante el uso de una condition variable para evitar hacer busy waiting, 
+y un lock para proteger el acceso a las variables que controlan el estado del lock. 
+
+## Sincronización de hilos para alcanzar el quórum
+Con la finalidad de que el servidor haga el sorteo respetando el quórumde cantidad mínima de agencias que deberían participar, se usó el macanismo de barrera de hilos de la librería estándar threading de Python (threading.Barrier) 
+que permite que un grupo de hilos se bloqueen hasta que todos los hilos del grupo hayan alcanzado un punto de sincronización común, en este caso, el punto de sincronización es cuando la cantidad de agencias que han enviado 
+todas sus apuestas es al menos la indicada en la variable de entorno `AGENCY_QUORUMIN`.
+
+Es importante notar que, la barrera libera exactamente `AGENCY_QUORUMIN` clientes para hacer el sorteo.
+Ejemplo: en caso de haber inicializado la barrera con `AGENCY_QUORUMIN=3`, el servidor esperará a que 3 agencias hayan enviado todas sus apuestas para hacer el sorteo, y luego de eso, liberará a los 3 clientes para que reciban los resultados de sus apuestas por más de que 
+hayan más clientes que hayan enviado todas sus apuestas (es decir estén esperando ser liberados), estos deberán esperar a que se haga otro sorteo para recibir los resultados de sus apuestas.
+
+De esta forma logramos sincronizar la ejecución concurrente de los hilos del servidor, y garantizar que un sorteo se haga solo cuando se haya alcanzado el quórum mínimo de agencias y evitando que se haga busy waiting.
+Además de que se puedan soportar múltiples rondas/sorteos sin necesidad de reiniciar el servidor, ya que la barrera se puede reutilizar para cada ronda/sorteo, esto es
+una vez se alcanzó el quorum, se liberan los hilos y se vuelve a esperar a que se alcance el quorum para la siguiente ronda/sorteo.
+
+## Cierre limpio de la aplicación
