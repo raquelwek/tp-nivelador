@@ -22,6 +22,8 @@ class Server:
         self.server_port = server_port
         self.agency_quorum_min = agency_quorum_min
 
+        self._quorum_barrier = threading.Barrier(agency_quorum_min)  # for managing the quorum
+
         # for graceful shutdown
         self._running = True
         signal.signal(signal.SIGTERM, self._handle_shutdown)
@@ -49,7 +51,14 @@ class Server:
                 message_amount += 1
 
                 if client_message.type == ALL_SENDED:  
-                    # @TO DO: Manage concurrency to wait until AGENCY_QUORUM_MIN is reached
+                    logger.info(action, logger.LogResult.in_progress, "waiting-for-quorum", "agency-id", agency_id)
+                    try: 
+                        self._quorum_barrier.wait()
+                    except threading.BrokenBarrierError:
+                        logger.error(action, logger.LogResult.fail, "quorum-aborted", "agency-id", agency_id)
+                        return
+                    
+                    logger.info(action, logger.LogResult.success, "quorum-reached", "agency-id", agency_id)
                     winners_message = self.getWinnersMessage(agency_id)
                     self.send_message(client_socket, winners_message)
                     logger.info(action, logger.LogResult.success, "sent", "winners", "message", str(winners_message))
@@ -95,6 +104,7 @@ class Server:
 
     def _graceful_shutdown(self, threads):
         action = "shutdown"
+        self._quorum_barrier.abort()
         deadline = time.monotonic() + SHUTDOWN_GRACE_PERIOD
 
         # fase polite
