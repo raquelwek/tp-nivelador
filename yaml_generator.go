@@ -6,6 +6,7 @@ import (
 	"strconv"
 )
 
+const AGENCY_QUORUM_MIN = 3
 const baseCompose = `services:
   server:
     build:
@@ -16,6 +17,7 @@ const baseCompose = `services:
       - PYTHONUNBUFFERED=1
       - SERVER_HOST=server
       - SERVER_PORT=5678
+      - AGENCY_QUORUM_MIN=%d
     ports:
       - "5678:5678"
 %s`
@@ -50,7 +52,7 @@ func buildClients(clientAmount int) string {
 }
 
 func buildYaml(clientAmount int) error {
-	content := fmt.Sprintf(baseCompose, buildClients(clientAmount))
+	content := fmt.Sprintf(baseCompose, AGENCY_QUORUM_MIN, buildClients(clientAmount))
 	const filename = "docker-compose.yaml"
 	file, err := os.Create(filename)
 	if err != nil {
