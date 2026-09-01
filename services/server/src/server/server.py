@@ -11,6 +11,7 @@ from server.protocol.bets_records import WinnersMessage
 from server.protocol.error_and_allsended import ErrorMessage
 from lottery.lottery import Lottery
 from safe_socket.safe_socket import recv_all, send_all
+from server.rw_lock import RWLock
 
 BETS_RECEIVED_NAME_FILE = "bets_received.csv"
 SOCKET_TIMEOUT_ACCEPT = 1.0
@@ -20,8 +21,9 @@ class Server:
     def __init__(self, server_host: str, server_port: int, agency_quorum_min: int) -> None:
         self.server_host = server_host
         self.server_port = server_port
-        self.agency_quorum_min = agency_quorum_min
 
+        self._file_lock = RWLock()
+        self.agency_quorum_min = agency_quorum_min
         self._quorum_barrier = threading.Barrier(agency_quorum_min)  # for managing the quorum
 
         # for graceful shutdown
@@ -144,23 +146,25 @@ class Server:
 
     def handle_bets_message(self, message: Message):
         action = "handle-bets-message"
+        self._file_lock.acquire_write()
         self.lottery.store_bets(message.bets)
+        self._file_lock.release_write()
         logger.info(action, logger.LogResult.success, "bets-count", len(message.bets))
 
     '''
     Returns a Winners message with all the winners of the agency_id passed as parameter. If there are no winners, it returns an empty Winners message.
     '''
-    # @ TODO: MAnage concurrency with shared file 
     def getWinnersMessage(self, agency_id: int) -> Message:
         action = "get-winners"
         winners_message = WinnersMessage(agency_id)
         winners = 0
+        self._file_lock.acquire_read()
         for bet in self.lottery.load_bets():
             if not (self.lottery.has_won(bet) and bet.agency_id == agency_id):
                 continue
             winners_message.add_bet(bet)
             winners += 1
-
+        self._file_lock.release_read()
         logger.info(action, logger.LogResult.success, "winners-count", winners)
         return winners_message
 
