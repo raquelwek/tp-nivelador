@@ -4,7 +4,8 @@ def recv_all(socket, size):
     bytes_received = b''
     while len(bytes_received) < size:
         chunk = socket.recv(size - len(bytes_received))
-        if not chunk:
+        if not chunk: 
+            # chunk == b'' indicates that the connection has been closed
             raise ConnectionError("closed before receiving all data")
         bytes_received += chunk
     return bytes_received

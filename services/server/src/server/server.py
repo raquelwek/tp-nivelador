@@ -1,14 +1,12 @@
 import socket
 import logger
-import safe_socket
 import threading
-import time
 import os
 import signal
 
 from server.protocol.messages import HEADER_LENGTH, unmarshall_message, Message, ALL_SENDED, BETS
 from server.protocol.bets_records import WinnersMessage
-from services.server.src.server.protocol.simple_messages import ErrorMessage, AckMessage
+from server.protocol.simple_messages import ErrorMessage, AckMessage
 from lottery.lottery import Lottery
 from safe_socket.safe_socket import recv_all, send_all
 from server.rw_lock import RWLock
@@ -37,6 +35,9 @@ class Server:
 
         self.lottery = Lottery(BETS_RECEIVED_NAME_FILE)
 
+    '''
+    Contains the logic responses and message meaning definited in the protocol
+    '''
     def _handle_client(self, client_socket):
         action = "handle-client"
         message_amount = 0
@@ -104,26 +105,33 @@ class Server:
         self._graceful_shutdown(threads)
         logger.info("shutdown", logger.LogResult.success)
 
+    '''
+    Closes all client sockets and waits for all threads to finish. It also aborts the quorum barrier to unblock any waiting threads.
+    If the client has finished and closed the conection, it continues with the ones that havent
+    '''
     def _graceful_shutdown(self, threads):
         action = "shutdown"
+        logger.info(action, logger.LogResult.in_progress, "initiating-graceful-shutdown")
         self._quorum_barrier.abort()
-        deadline = time.monotonic() + SHUTDOWN_GRACE_PERIOD
 
-        # fase polite
-        for client_socket, thread in threads:
-            remaining = deadline - time.monotonic()
-            thread.join(timeout=max(0, remaining))
+        for client_socket, _ in threads: 
+            try: 
+                client_socket.shutdown(socket.SHUT_RDWR)
+            except OSError: pass
+            try:
+                client_socket.close()
+            except OSError: pass
 
-        # fase forzada: revisar si esto es necesario, idem con timer
-        for client_socket, thread in threads:
-            if thread.is_alive():
-                logger.info(action, logger.LogResult.in_progress, "force-closing-stuck-client")
-                try:
-                    client_socket.shutdown(socket.SHUT_RDWR)
-                except OSError:
-                    pass
-                thread.join()
+        for _, thread in threads:
+            thread.join()
 
+        
+        
+    
+    '''
+    Receives the bytes of a message following the protocol and unmarshalls it into a Message object.
+    It first receives the header, then the payload, and finally combines them to create the message.
+    '''
     def recv_message(self, client_socket:socket.socket) -> Message:
         action = "recv-message"
         logger.info(action, logger.LogResult.in_progress, "waiting", "header")
@@ -138,12 +146,17 @@ class Server:
         logger.info(action, logger.LogResult.success, "message", str(message))
         return message
 
+    '''
+    Sends a message to the client socket
+    '''
     def send_message(self, client_socket: socket.socket, message: Message):
         action = "send-message"
         message_bytes = message.marshall()
         send_all(client_socket, message_bytes)
         logger.info(action, logger.LogResult.success, "message", str(message))
-
+    '''
+    Stores the bests received in the message
+    '''
     def handle_bets_message(self, message: Message):
         action = "handle-bets-message"
         self._file_lock.acquire_write()
@@ -167,7 +180,10 @@ class Server:
         self._file_lock.release_read()
         logger.info(action, logger.LogResult.success, "winners-count", winners)
         return winners_message
-
-    def _handle_shutdown(self, signum, frame):
+    '''
+    Handles the shutdown signal (SIGTERM) and sets the running flag to False
+    in order to stop the server gracefully. It also logs the shutdown event.
+    '''
+    def _handle_shutdown(self, sig, frame):
         logger.info("shutdown", logger.LogResult.in_progress)
         self._running = False
