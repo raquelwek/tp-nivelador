@@ -1,4 +1,5 @@
 import threading
+from contextlib import contextmanager
 
 class RWLock:
     def __init__(self):
@@ -29,3 +30,19 @@ class RWLock:
         with self.lock:
             self.writing = False
             self.condition.notify_all()
+
+    @contextmanager
+    def read_lock(self):
+        self.acquire_read()
+        try:
+            yield
+        finally:
+            self.release_read()
+
+    @contextmanager
+    def write_lock(self):
+        self.acquire_write()
+        try:
+            yield
+        finally:
+            self.release_write()

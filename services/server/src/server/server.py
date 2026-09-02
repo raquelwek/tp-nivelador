@@ -159,9 +159,9 @@ class Server:
     '''
     def handle_bets_message(self, message: Message):
         action = "handle-bets-message"
-        self._file_lock.acquire_write()
-        self.lottery.store_bets(message.bets)
-        self._file_lock.release_write()
+        logger.info(action, logger.LogResult.in_progress, "bets-count", len(message.bets))
+        with self._file_lock.write_lock():
+            self.lottery.store_bets(message.bets)
         logger.info(action, logger.LogResult.success, "bets-count", len(message.bets))
 
     '''
@@ -170,15 +170,13 @@ class Server:
     def getWinnersMessage(self, agency_id: int) -> Message:
         action = "get-winners"
         winners_message = WinnersMessage(agency_id)
-        winners = 0
-        self._file_lock.acquire_read()
-        for bet in self.lottery.load_bets():
-            if not (self.lottery.has_won(bet) and bet.agency_id == agency_id):
-                continue
-            winners_message.add_bet(bet)
-            winners += 1
-        self._file_lock.release_read()
-        logger.info(action, logger.LogResult.success, "winners-count", winners)
+        logger.info(action, logger.LogResult.in_progress, "agency-id", agency_id)
+        with self._file_lock.read_lock():
+            for bet in self.lottery.load_bets():
+                if not (self.lottery.has_won(bet) and bet.agency_id == agency_id):continue
+                winners_message.add_bet(bet)
+        
+        logger.info(action, logger.LogResult.success, "winners-count", len(winners_message.bets), "agency-id", agency_id)
         return winners_message
     '''
     Handles the shutdown signal (SIGTERM) and sets the running flag to False
