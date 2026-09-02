@@ -3,6 +3,8 @@ package model
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
+	"iter"
 	"os"
 	"strconv"
 	"strings"
@@ -54,6 +56,50 @@ func (a *AgencyImpl) GetBets() ([]Bet, error) {
 		bets = append(bets, bet)
 	}
 	return bets, nil
+}
+
+// LoadBets devuelve un iterador que lee el CSV línea por línea y puede retornar un error
+func (a *AgencyImpl) LoadBets() iter.Seq2[Bet, error] {
+	return func(yield func(Bet, error) bool) {
+		file, err := os.Open(a.InputFile)
+		if err != nil {
+			yield(Bet{}, err)
+			return
+		}
+		defer file.Close() // Se cierra automáticamente al terminar de iterar
+
+		reader := csv.NewReader(file)
+
+		for {
+			row, err := reader.Read()
+			if err == io.EOF {
+				break // Fin del archivo
+			}
+			if err != nil {
+				yield(Bet{}, err)
+				return
+			}
+
+			name, lastName, document, birthdate, number := row[0], row[1], row[2], row[3], row[4]
+			docu, _ := strconv.Atoi(document)
+			num, _ := strconv.Atoi(number)
+			birthdate = strings.ReplaceAll(birthdate, "-", "")
+
+			bet := Bet{
+				AgencyId:  a.Id,
+				FirstName: name,
+				LastName:  lastName,
+				Document:  docu,
+				Birthdate: birthdate,
+				Number:    num,
+			}
+
+			// yield envía el valor. Si el consumidor hace un "break", yield devuelve false y salimos.
+			if !yield(bet, nil) {
+				return
+			}
+		}
+	}
 }
 
 func (a *AgencyImpl) StoreWinner(winningBets []Bet) error {

@@ -75,16 +75,14 @@ func (client *Client) Run() error {
 	}
 	agency := model.CreateAgency(agencyId, client.config.OutputFile, client.config.InputFile)
 
-	agencyBets, err := agency.GetBets()
-	if err != nil {
-		logger.Error(mainAction, logger.Fail, "err", err)
-		return err
-	}
-	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId, "bets-read", len(agencyBets))
-
 	messageBetsAmount := 0
 	payload := protocol.CreateBetsPayload(client.config.BatchSize)
-	for _, bet := range agencyBets {
+	for bet, err := range agency.LoadBets() {
+		if err != nil {
+			logger.Error(mainAction, logger.Fail, "err", err)
+			return err
+		}
+
 		err1 := payload.AddBet(bet)
 		logger.Info(mainAction, logger.InProgress, "agency-id", client.config.AgencyId, "bet added", bet)
 		if err1 != nil && err1.Error() == "cannot add bet: batch is full" {
