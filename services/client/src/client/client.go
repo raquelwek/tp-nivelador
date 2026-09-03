@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/binary"
+	"errors"
 	"net"
 	"time"
 
@@ -56,7 +57,6 @@ func connectToServer(host, port string) (net.Conn, error) {
 		logger.Info(action, logger.Success)
 		break
 	}
-
 	return conn, err
 }
 
@@ -69,30 +69,29 @@ func (client *Client) Run() error {
 		return err
 	}
 	allSended := protocol.CreateMessage(byte(agency.GetId()), protocol.CreateAllSendedPayload())
-	client.receiveAck()
+
 	sendErr := client.send(allSended)
 	if sendErr != nil {
-		logger.Error(mainAction, logger.Fail, "err", sendErr)
+		logger.Error(mainAction, logger.Fail, "could not send all sended message", sendErr)
 		return sendErr
 	}
 
 	winners, err := client.receive()
 	if err != nil {
+		logger.Error(mainAction, logger.Fail, "could not receive winners message", err)
 		return err
 	}
-	winnersPayload, ok := winners.GetPayload().(*protocol.WinnersPayload)
-	if !ok {
-		logger.Error(mainAction, logger.Fail, "err", "invalid payload type")
-		return err
+	if winners.GetPayload().Type() != protocol.WINNERS {
+		return errors.New("invalid payload type")
 	}
 
-	err = agency.StoreWinner(winnersPayload.GetWinners())
+	err = agency.StoreWinner(winners.GetPayload().(*protocol.WinnersPayload).GetWinners())
 	if err != nil {
-		logger.Error(mainAction, logger.Fail, "err", err)
+		logger.Error(mainAction, logger.Fail, "could not store winners", err)
 		return err
 	}
 
-	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
+	logger.Info(mainAction, logger.Success)
 	return nil
 }
 
@@ -100,50 +99,36 @@ func (client *Client) processBets(agency model.Agency) error {
 	mainAction := "process-bets"
 	messageBetsAmount := 0
 	payload := protocol.CreateBetsPayload(client.config.BatchSize)
+
 	for bet, err := range agency.LoadBets() {
 		if err != nil {
-			logger.Error(mainAction, logger.Fail, "err", err)
 			return err
 		}
 
-		err1 := payload.AddBet(bet)
-		logger.Info(mainAction, logger.InProgress, "agency-id", client.config.AgencyId, "bet added", bet)
-		if err1 != nil && err1.Error() == "cannot add bet: batch is full" {
-
-			// Envía el payload lleno
-			message := protocol.CreateMessage(byte(agency.GetId()), payload)
-			err = client.send(message)
-			if err != nil {
-				logger.Error(mainAction, logger.Fail, "err", err)
+		if err := payload.AddBet(bet); err != nil {
+			if err := client.sendBetsAndReceiveAck(agency, payload, &messageBetsAmount); err != nil {
 				return err
 			}
-			client.receiveAck()
-			messageBetsAmount++
-			// Crea nuevo payload y agrega la apuesta que causó el error
 			payload = protocol.CreateBetsPayload(client.config.BatchSize)
-			err1 = payload.AddBet(bet)
-			if err1 != nil {
-				logger.Error(mainAction, logger.Fail, "err", err1)
-				return err1
+			if err := payload.AddBet(bet); err != nil {
+				return err
 			}
 		}
 	}
-	// Envía lo que quedó en el payload
-	message := protocol.CreateMessage(byte(agency.GetId()), payload)
-	err := client.send(message)
-	if err != nil {
-		logger.Error(mainAction, logger.Fail, "err", err)
-		return err
+	if len(payload.Records) > 0 {
+		if err := client.sendBetsAndReceiveAck(agency, payload, &messageBetsAmount); err != nil {
+			return err
+		}
 	}
-	messageBetsAmount++
-	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId, "messages-bets-sent", messageBetsAmount)
+
+	logger.Info(mainAction, logger.Success, "messages-bets-sent", messageBetsAmount)
 	return nil
 }
 
 // Marshall the message and send it through the socket. Returns an error if the message could not be sent.
 func (client *Client) send(message protocol.Message) error {
 	mainAction := "send-message"
-	messageArgs := []any{"agency-id", client.config.AgencyId, "message-type", message.GetPayload().Type().String()}
+	messageArgs := []any{"message-type", message.GetPayload().Type().String()}
 	logger.Info(mainAction, logger.InProgress, messageArgs...)
 
 	bytes, err := message.Marshal()
@@ -161,7 +146,44 @@ func (client *Client) send(message protocol.Message) error {
 	return nil
 }
 
-// / Makes sure the cliet receives an ACK for bets messages
+// Receives a message with the structure indicated in the protocol
+// Returns the message and an error if the message could not be received or unmarshalled.
+func (client *Client) receive() (protocol.Message, error) {
+	mainAction := "receive-message"
+	logger.Info(mainAction, logger.InProgress)
+
+	bytes_header, err := safe_socket.RecvAll(client.conn, protocol.HeaderLength)
+	if err != nil {
+		logger.Error("receive-message", logger.Fail, "err", err)
+		return nil, err
+	}
+	payloadLength := (int)(binary.BigEndian.Uint32(bytes_header[2:6]))
+	bytes_payload, err := safe_socket.RecvAll(client.conn, payloadLength)
+	if err != nil {
+		logger.Error("receive-message", logger.Fail, "err", err)
+		return nil, err
+	}
+	message, err := protocol.UnmarshalMessage(append(bytes_header, bytes_payload...), client.config.BatchSize)
+	if err != nil {
+		logger.Error("unmarshal-message", logger.Fail, "err", err)
+		return nil, err
+	}
+	messageArgs := []any{"message-type", message.GetPayload().Type().String(), "payload-length", payloadLength}
+	logger.Info(mainAction, logger.Success, messageArgs...)
+	return message, nil
+
+}
+
+func (client *Client) sendBetsAndReceiveAck(agency model.Agency, payload *protocol.BetsPayload, messageBetsAmount *int) error {
+	message := protocol.CreateMessage(byte(agency.GetId()), payload)
+	err := client.send(message)
+	if err != nil {
+		return err
+	}
+	*messageBetsAmount++
+
+	return client.receiveAck()
+}
 func (client *Client) receiveAck() error {
 	msg, err := client.receive()
 	if err != nil {
@@ -170,37 +192,7 @@ func (client *Client) receiveAck() error {
 	}
 	if msg != nil && msg.GetPayload().Type() != protocol.ACK {
 		logger.Error("receive-ack", logger.Fail, "err", "invalid payload type")
-		return nil
+		return errors.New("unexpected payload type, expected ACK")
 	}
 	return nil
-
-}
-
-// Receives a message with the structure indicated in the protocol
-// Returns the message and an error if the message could not be received or unmarshalled.
-func (client *Client) receive() (protocol.Message, error) {
-	mainAction := "receive-message"
-	messageArgs := []any{"agency-id", client.config.AgencyId}
-	logger.Info(mainAction, logger.InProgress, messageArgs...)
-
-	bytes_header, err := safe_socket.RecvAll(client.conn, protocol.HeaderLength)
-	if err != nil {
-		logger.Error("receive-message", logger.Fail, messageArgs...)
-		return nil, err
-	}
-	payloadLength := (int)(binary.BigEndian.Uint32(bytes_header[2:6]))
-	bytes_payload, err := safe_socket.RecvAll(client.conn, payloadLength)
-	if err != nil {
-		logger.Error("receive-message", logger.Fail, messageArgs...)
-		return nil, err
-	}
-	message, err := protocol.UnmarshalMessage(append(bytes_header, bytes_payload...), client.config.BatchSize)
-	if err != nil {
-		logger.Error("unmarshal-message", logger.Fail, messageArgs...)
-		return nil, err
-	}
-	messageArgs = append(messageArgs, "message-type", message.GetPayload().Type().String(), "payload-length", payloadLength)
-	logger.Info(mainAction, logger.Success, messageArgs...)
-	return message, nil
-
 }

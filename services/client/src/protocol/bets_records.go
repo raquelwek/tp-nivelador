@@ -14,9 +14,10 @@ type betRecordList struct {
 	batchSize int
 }
 
+// Adds a bet to the list. Returns an error if the batch is full.
 func (b *betRecordList) AddBet(bet lottery.Bet) error {
 	if len(b.Records) >= b.batchSize {
-		return fmt.Errorf("cannot add bet: batch is full")
+		return &FullBatchError{}
 	}
 	b.Records = append(b.Records, bet)
 	return nil
@@ -35,7 +36,7 @@ func (b *betRecordList) MarshalPayload() ([]byte, error) {
 
 func (p *betRecordList) UnmarshalPayload(data []byte) error {
 	if len(data) < 2 {
-		return fmt.Errorf("payload too short for bet count")
+		return &InvalidPayloadError{mesage: "payload too short"}
 	}
 	count := binary.BigEndian.Uint16(data[0:2])
 	offset := 2
@@ -46,7 +47,7 @@ func (p *betRecordList) UnmarshalPayload(data []byte) error {
 		offset = new_offset
 	}
 	if len(p.Records) != int(count) {
-		return fmt.Errorf("bets count mismatch: expected %d, got %d", count, len(p.Records))
+		return &InvalidPayloadError{mesage: fmt.Sprintf("bets count mismatch: expected %d, got %d", count, len(p.Records))}
 	}
 	return nil
 }
