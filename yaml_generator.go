@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-const AGENCY_QUORUM_MIN = 3
+const AGENCY_QUORUM_MIN = 5
 const baseCompose = `services:
   server:
     build:

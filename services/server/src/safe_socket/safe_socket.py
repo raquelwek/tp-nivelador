@@ -11,5 +11,9 @@ def recv_all(socket, size):
     return bytes_received
 
 def send_all(socket: socket.socket, bytes):
-    #  this method continues to send data from bytes until either all data has been sent or an error occurs
-    return socket.sendall(bytes)
+    bytes_sent = 0
+    while bytes_sent < len(bytes):
+        sent = socket.send(bytes[bytes_sent:])
+        bytes_sent += sent
+        
+    return bytes_sent
