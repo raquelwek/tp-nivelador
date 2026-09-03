@@ -38,7 +38,7 @@ func (a *AgencyImpl) LoadBets() iter.Seq2[Bet, error] {
 		for {
 			row, err := reader.Read()
 			if err == io.EOF {
-				break // Fin del archivo
+				break
 			}
 			if err != nil {
 				yield(Bet{}, err)

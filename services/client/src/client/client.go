@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"net"
@@ -60,24 +61,35 @@ func connectToServer(host, port string) (net.Conn, error) {
 	return conn, err
 }
 
-func (client *Client) Run() error {
+func (client *Client) Run(ctx context.Context) error {
 	const mainAction = "test-lottery-server"
+	go sigtermHandler(ctx, client)
 	agency := model.CreateAgency(client.config.AgencyId, client.config.OutputFile, client.config.InputFile)
-	err := client.processBets(agency)
+	err := client.processBets(agency, ctx)
 	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		logger.Error(mainAction, logger.Fail, "could not process bets", err)
 		return err
 	}
 	allSended := protocol.CreateMessage(byte(agency.GetId()), protocol.CreateAllSendedPayload())
-
 	sendErr := client.send(allSended)
+
 	if sendErr != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		logger.Error(mainAction, logger.Fail, "could not send all sended message", sendErr)
 		return sendErr
+
 	}
 
 	winners, err := client.receive()
 	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		logger.Error(mainAction, logger.Fail, "could not receive winners message", err)
 		return err
 	}
@@ -95,12 +107,18 @@ func (client *Client) Run() error {
 	return nil
 }
 
-func (client *Client) processBets(agency model.Agency) error {
+func (client *Client) processBets(agency model.Agency, ctx context.Context) error {
 	mainAction := "process-bets"
 	messageBetsAmount := 0
 	payload := protocol.CreateBetsPayload(client.config.BatchSize)
 
 	for bet, err := range agency.LoadBets() {
+		select {
+		case <-ctx.Done():
+			logger.Info("process-bets", "SIGTERM received, stopping bet processing")
+			return ctx.Err()
+		default:
+		}
 		if err != nil {
 			return err
 		}
@@ -195,4 +213,18 @@ func (client *Client) receiveAck() error {
 		return errors.New("unexpected payload type, expected ACK")
 	}
 	return nil
+}
+func (client *Client) Close() {
+	const mainAction = "close-client"
+	logger.Info(mainAction, logger.InProgress)
+	if client.conn != nil {
+		client.conn.Close()
+	}
+	logger.Info(mainAction, logger.Success)
+}
+
+func sigtermHandler(ctx context.Context, client *Client) {
+	logger.Info("sigterm-received", logger.InProgress)
+	<-ctx.Done()
+	client.Close()
 }
