@@ -3,7 +3,6 @@ package client
 import (
 	"encoding/binary"
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
@@ -15,15 +14,10 @@ import (
 const CONNECTION_ATTEMPTS_MAX = 10
 const CONNECTION_ATTEMPS_DELAY_MS = 200
 
-const ECHO_CLIENT_MESSAGE_AMOUNT = 3
-const ECHO_CLIENT_MESSAGE_DELAY_MS = 1000
-
-const FILE_PERMISSIONS_CODE = 0644
-
 type ClientConfig struct {
 	ServerHost string
 	ServerPort string
-	AgencyId   string
+	AgencyId   int
 	InputFile  string
 	OutputFile string
 	BatchSize  int
@@ -68,53 +62,13 @@ func connectToServer(host, port string) (net.Conn, error) {
 
 func (client *Client) Run() error {
 	const mainAction = "test-lottery-server"
-	agencyId, err := strconv.Atoi(client.config.AgencyId)
+	agency := model.CreateAgency(client.config.AgencyId, client.config.OutputFile, client.config.InputFile)
+	err := client.processBets(agency)
 	if err != nil {
-		logger.Error(mainAction, logger.Fail, "err", err)
+		logger.Error(mainAction, logger.Fail, "could not process bets", err)
 		return err
 	}
-	agency := model.CreateAgency(agencyId, client.config.OutputFile, client.config.InputFile)
-
-	messageBetsAmount := 0
-	payload := protocol.CreateBetsPayload(client.config.BatchSize)
-	for bet, err := range agency.LoadBets() {
-		if err != nil {
-			logger.Error(mainAction, logger.Fail, "err", err)
-			return err
-		}
-
-		err1 := payload.AddBet(bet)
-		logger.Info(mainAction, logger.InProgress, "agency-id", client.config.AgencyId, "bet added", bet)
-		if err1 != nil && err1.Error() == "cannot add bet: batch is full" {
-
-			// Envía el payload lleno
-			message := protocol.CreateMessage(byte(agencyId), payload)
-			err = client.send(message)
-			if err != nil {
-				logger.Error(mainAction, logger.Fail, "err", err)
-				return err
-			}
-			client.receiveAck()
-			messageBetsAmount++
-			// Crea nuevo payload y agrega la apuesta que causó el error
-			payload = protocol.CreateBetsPayload(client.config.BatchSize)
-			err1 = payload.AddBet(bet)
-			if err1 != nil {
-				logger.Error(mainAction, logger.Fail, "err", err1)
-				return err1
-			}
-		}
-	}
-	// Envía lo que quedó en el payload
-	message := protocol.CreateMessage(byte(agencyId), payload)
-	err = client.send(message)
-	if err != nil {
-		logger.Error(mainAction, logger.Fail, "err", err)
-		return err
-	}
-	messageBetsAmount++
-	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId, "messages-bets-sent", messageBetsAmount)
-	allSended := protocol.CreateMessage(byte(agencyId), protocol.CreateAllSendedPayload())
+	allSended := protocol.CreateMessage(byte(agency.GetId()), protocol.CreateAllSendedPayload())
 	client.receiveAck()
 	sendErr := client.send(allSended)
 	if sendErr != nil {
@@ -142,6 +96,51 @@ func (client *Client) Run() error {
 	return nil
 }
 
+func (client *Client) processBets(agency model.Agency) error {
+	mainAction := "process-bets"
+	messageBetsAmount := 0
+	payload := protocol.CreateBetsPayload(client.config.BatchSize)
+	for bet, err := range agency.LoadBets() {
+		if err != nil {
+			logger.Error(mainAction, logger.Fail, "err", err)
+			return err
+		}
+
+		err1 := payload.AddBet(bet)
+		logger.Info(mainAction, logger.InProgress, "agency-id", client.config.AgencyId, "bet added", bet)
+		if err1 != nil && err1.Error() == "cannot add bet: batch is full" {
+
+			// Envía el payload lleno
+			message := protocol.CreateMessage(byte(agency.GetId()), payload)
+			err = client.send(message)
+			if err != nil {
+				logger.Error(mainAction, logger.Fail, "err", err)
+				return err
+			}
+			client.receiveAck()
+			messageBetsAmount++
+			// Crea nuevo payload y agrega la apuesta que causó el error
+			payload = protocol.CreateBetsPayload(client.config.BatchSize)
+			err1 = payload.AddBet(bet)
+			if err1 != nil {
+				logger.Error(mainAction, logger.Fail, "err", err1)
+				return err1
+			}
+		}
+	}
+	// Envía lo que quedó en el payload
+	message := protocol.CreateMessage(byte(agency.GetId()), payload)
+	err := client.send(message)
+	if err != nil {
+		logger.Error(mainAction, logger.Fail, "err", err)
+		return err
+	}
+	messageBetsAmount++
+	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId, "messages-bets-sent", messageBetsAmount)
+	return nil
+}
+
+// Marshall the message and send it through the socket. Returns an error if the message could not be sent.
 func (client *Client) send(message protocol.Message) error {
 	mainAction := "send-message"
 	messageArgs := []any{"agency-id", client.config.AgencyId, "message-type", message.GetPayload().Type().String()}
@@ -161,6 +160,8 @@ func (client *Client) send(message protocol.Message) error {
 	logger.Info(mainAction, logger.Success, messageArgs...)
 	return nil
 }
+
+// / Makes sure the cliet receives an ACK for bets messages
 func (client *Client) receiveAck() error {
 	msg, err := client.receive()
 	if err != nil {
@@ -174,6 +175,9 @@ func (client *Client) receiveAck() error {
 	return nil
 
 }
+
+// Receives a message with the structure indicated in the protocol
+// Returns the message and an error if the message could not be received or unmarshalled.
 func (client *Client) receive() (protocol.Message, error) {
 	mainAction := "receive-message"
 	messageArgs := []any{"agency-id", client.config.AgencyId}

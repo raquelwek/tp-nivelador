@@ -14,6 +14,10 @@ func loadConfig() (client.ClientConfig, error) {
 	if agencyId == "" {
 		return client.ClientConfig{}, errors.New("AGENCY_ID environment variable is required")
 	}
+	agencyIdInt, err := strconv.Atoi(agencyId)
+	if err != nil {
+		return client.ClientConfig{}, errors.New("AGENCY_ID environment variable must be an integer")
+	}
 
 	serverHost := os.Getenv("SERVER_HOST")
 	if serverHost == "" {
@@ -47,7 +51,7 @@ func loadConfig() (client.ClientConfig, error) {
 	return client.ClientConfig{
 		ServerHost: serverHost,
 		ServerPort: serverPort,
-		AgencyId:   agencyId,
+		AgencyId:   agencyIdInt,
 		InputFile:  inputFile,
 		OutputFile: outputFile,
 		BatchSize:  batchSizeInt,
