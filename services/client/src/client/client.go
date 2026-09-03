@@ -94,6 +94,7 @@ func (client *Client) Run() error {
 				logger.Error(mainAction, logger.Fail, "err", err)
 				return err
 			}
+			client.receiveAck()
 			messageBetsAmount++
 			// Crea nuevo payload y agrega la apuesta que causó el error
 			payload = protocol.CreateBetsPayload(client.config.BatchSize)
@@ -114,6 +115,7 @@ func (client *Client) Run() error {
 	messageBetsAmount++
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId, "messages-bets-sent", messageBetsAmount)
 	allSended := protocol.CreateMessage(byte(agencyId), protocol.CreateAllSendedPayload())
+	client.receiveAck()
 	sendErr := client.send(allSended)
 	if sendErr != nil {
 		logger.Error(mainAction, logger.Fail, "err", sendErr)
@@ -159,7 +161,19 @@ func (client *Client) send(message protocol.Message) error {
 	logger.Info(mainAction, logger.Success, messageArgs...)
 	return nil
 }
+func (client *Client) receiveAck() error {
+	msg, err := client.receive()
+	if err != nil {
+		logger.Error("receive-ack", logger.Fail, "err", err)
+		return err
+	}
+	if msg != nil && msg.GetPayload().Type() != protocol.ACK {
+		logger.Error("receive-ack", logger.Fail, "err", "invalid payload type")
+		return nil
+	}
+	return nil
 
+}
 func (client *Client) receive() (protocol.Message, error) {
 	mainAction := "receive-message"
 	messageArgs := []any{"agency-id", client.config.AgencyId}

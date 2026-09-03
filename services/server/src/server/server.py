@@ -70,6 +70,7 @@ class Server:
                 
                 elif client_message.type == BETS:
                     self.handle_bets_message(client_message)
+                    self.send_ack(client_socket, agency_id)
 
         except Exception as e:
             logger.error(action, logger.LogResult.fail, "error", str(e))
@@ -185,3 +186,8 @@ class Server:
     def _handle_shutdown(self, sig, frame):
         logger.info("shutdown", logger.LogResult.in_progress)
         self._running = False
+
+    def send_ack(self, client_socket: socket.socket, agency_id: int):
+        ack_message = AckMessage(agency_id)
+        self.send_message(client_socket, ack_message)
+       
