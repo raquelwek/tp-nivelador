@@ -1,9 +1,9 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
-	"strings"
 
 	lottery "github.com/7574-sistemas-distribuidos/tp-nivelador/src/model"
 )
@@ -13,6 +13,15 @@ type betRecordList struct {
 	Records   []lottery.Bet
 	batchSize int
 }
+
+const (
+	documentLen  = 4
+	numberLen    = 2
+	fnLenLen     = 1
+	lnLenLen     = 1
+	birthdateLen = 8
+	headerLen    = documentLen + numberLen + fnLenLen + lnLenLen + birthdateLen // 16
+)
 
 // Adds a bet to the list. Returns an error if the batch is full.
 func (b *betRecordList) AddBet(bet lottery.Bet) error {
@@ -24,12 +33,18 @@ func (b *betRecordList) AddBet(bet lottery.Bet) error {
 }
 
 func (b *betRecordList) MarshalPayload() ([]byte, error) {
-	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, uint16(len(b.Records)))
+	// Pre-calculate total size to avoid per-bet allocations
+	total := 2 // 2-byte count header
+	for _, bet := range b.Records {
+		total += headerLen + len(bet.FirstName) + len(bet.LastName)
+	}
+
+	buf := make([]byte, total)
+	binary.BigEndian.PutUint16(buf[0:2], uint16(len(b.Records)))
+	offset := 2
 
 	for _, bet := range b.Records {
-		record := marshalBetRecord(bet)
-		buf = append(buf, record...)
+		offset = marshalBetRecordInto(buf, offset, bet)
 	}
 	return buf, nil
 }
@@ -74,36 +89,35 @@ func CreateWinnersPayload(batchSize int) *WinnersPayload {
 func (p *WinnersPayload) GetWinners() []lottery.Bet {
 	return p.Records
 }
-func marshalBetRecord(bet lottery.Bet) []byte {
-	payload := make([]byte, 0)
 
-	documentBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(documentBytes, uint32(bet.Document))
-	payload = append(payload, documentBytes...)
+// marshalBetRecordInto writes a bet record into buf starting at offset and returns the new offset.
+func marshalBetRecordInto(buf []byte, offset int, bet lottery.Bet) int {
+	lenName := len(bet.FirstName)
+	lenLastName := len(bet.LastName)
 
-	numberBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(numberBytes, uint16(bet.Number))
-	payload = append(payload, numberBytes...)
+	binary.BigEndian.PutUint32(buf[offset:], uint32(bet.Document))
+	offset += documentLen
 
-	nameBytes := []byte(bet.FirstName)
-	lastNameBytes := []byte(bet.LastName)
+	binary.BigEndian.PutUint16(buf[offset:], uint16(bet.Number))
+	offset += numberLen
 
-	payload = append(payload, byte(len(nameBytes)))
-	payload = append(payload, byte(len(lastNameBytes)))
+	buf[offset] = byte(lenName)
+	offset += fnLenLen
 
-	birthdateBytes := []byte(bet.Birthdate)
-	birthdateBytes = append(
-		birthdateBytes,
-		make([]byte, 8-len(birthdateBytes))...,
-	)
-	payload = append(payload, birthdateBytes...)
+	buf[offset] = byte(lenLastName)
+	offset += lnLenLen
 
-	payload = append(payload, nameBytes...)
-	payload = append(payload, lastNameBytes...)
+	copy(buf[offset:offset+birthdateLen], bet.Birthdate) // padea con 0x00 si falta
+	offset += birthdateLen
 
-	return payload
+	copy(buf[offset:], bet.FirstName)
+	offset += lenName
+
+	copy(buf[offset:], bet.LastName)
+	offset += lenLastName
+
+	return offset
 }
-
 func UnmarshalBetRecord(offset int, payload []byte) (lottery.Bet, int) {
 	document := int(binary.BigEndian.Uint32(payload[offset : offset+4]))
 	offset += 4
@@ -112,15 +126,12 @@ func UnmarshalBetRecord(offset int, payload []byte) (lottery.Bet, int) {
 	offset += 2
 
 	nameLength := int(payload[offset])
-	offset += 1
+	offset++
 
 	lastNameLength := int(payload[offset])
-	offset += 1
+	offset++
 
-	birthdate := strings.TrimRight(
-		string(payload[offset:offset+8]),
-		"\x00",
-	)
+	birthdate := string(bytes.TrimRight(payload[offset:offset+8], "\x00"))
 	offset += 8
 
 	name := string(payload[offset : offset+nameLength])
