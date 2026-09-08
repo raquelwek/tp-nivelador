@@ -147,8 +147,36 @@ Además de que se puedan soportar múltiples rondas/sorteos sin necesidad de rei
 una vez se alcanzó el quorum, se liberan los hilos y se vuelve a esperar a que se alcance el quorum para la siguiente ronda/sorteo.
 
 ## Cierre limpio de la aplicación
-Para el cliente se usó la librería estándar signal[https://pkg.go.dev/os/signal] para capturar la señal 
-`SIGTERM` con `NotifyContext` que permite devolver el contexto de el padre que lo marcó como *Done* y de esta forma poder indicar el cierre del programa, 
-dicho contexto se marca como *Done* al recibir la señal en la go rutine bloqueante `sistemHandler` en el código.
+Para el cliente se usó la librería estándar signal (https://pkg.go.dev/os/signal) para capturar la señal
+SIGTERM mediante `NotifyContext`, que devuelve un contexto derivado del padre y lo marca como `Done()`
+al recibir la señal.
+Al iniciar `Run()`del cliente, también se inicia una gorutine `sigtermHandler` que espera que dicho contetxo se marque como 
+`Done()` indicando que se recibió la señal esperada y que por lo tanto podemos cerrar el socket del cliente con `conn.Close()` de
+esta manera permitimos que se desbloquee cualquier escritura o lectura en curso.
+
 En este caso el único file descriptor que podría estar abierto es el socket del cliente (los archivos de input y output en las 
-funciones que se usan tienen la cláusala de defer que se asegura que siempre se cierren)  como también en el main por robustez.
+funciones que se usan tienen la cláusula de defer que se asegura que siempre se cierren).
+
+De forma análoga, para el servidor en Python se utilizó la librería signal
+(https://docs.python.org/3/library/signal.html). El handler correspondiente
+únicamente marca un flag booleano (`self._running = False`); para que ese flag sea efectivo sin
+depender de que llegue una nueva conexión, el `accept()` del hilo principal se configura con un timeout
+corto (`SOCKET_TIMEOUT_ACCEPT`), de forma que el loop se despierta periódicamente, revisa el flag y
+puede salir sin quedar bloqueado indefinidamente esperando una conexión entrante. Al salir del loop, el
+`server_socket` se cierra automáticamente por estar declarado dentro de un `with`.
+
+A continuación se ejecuta `_graceful_shutdown`, que se asegura de liberar los recursos restantes:
+
+- **Barrera**: se cierra con `_quorum_barrier.abort()`, para liberar cualquier hilo que esté bloqueado
+  esperando el quorum de apuestas.
+- **Sockets por cliente**: a diferencia del `accept()`, los sockets de cliente permanecen bloqueados en
+  `recv`/`send` sin timeout mientras procesan mensajes, y cancelar la señal no interrumpe esas llamadas
+  por sí solo. Por eso, para cada socket de cliente activo se llama a
+  `client_socket.shutdown(socket.SHUT_RDWR)` seguido de `client_socket.close()` (ambos protegidos con
+  `try/except OSError`, por si el socket ya había sido cerrado previamente por el propio cliente),
+  forzando la interrupción de cualquier lectura o escritura en curso.
+- **Threads por cliente**: finalmente se espera (`join`) a que todos los threads terminen antes de que el
+  hilo principal finalice, asegurando que la limpieza de cada uno se complete antes de cerrar el proceso.
+- **Archivos**: se abren siempre con `with open(...)`, lo que garantiza su cierre automático incluso ante
+  excepciones.
+
