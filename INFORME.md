@@ -13,8 +13,6 @@ Para eso definimos el protocolo de comunicación de capa de aplicación, teniend
 - Para enviar información del flujo de apuestas
     - BETS: Este mensaje puede contener tantos registros de apuestas como entren en un batch definido en la variable de entorno `BATCH_SIZE`.
     - WINNERS: Este mensaje puede contener tantos registros de apuestas ganadoras de la agencia destino como entren en un batch, puede no contener registros. Además indica el fin de la comunicación entre estos.
-    - ERROR: Este mensaje indica que hubo un error en la comunicación, por lo que el cliente debe cerrar la conexión con el servidor.   
-
 - De control
     - ALL_SENDED: Este mensaje indica que el cliente ha enviado todos los registros de apuestas que tenía para enviar.
 
@@ -30,7 +28,10 @@ Análogamente actúa la agencia 2, pero es importante notar que luego de que amb
   <img src="img/ejemplo_protocolo.svg" alt="Protocolo de comunicación">
 </p>
 
-En caso de que haya algún tipo de error en la comunicación tanto servidor como cliente deben cerrar la conexión y terminar la ejecución, sea interno o por un mesaje recibido. 
+>  ACTUALIZACIÓN; Si bien al comienzo no se tuvieron en cuenta los ACK, se decidió agregarlos para confirmar los mentajes de tipo BETS, 
+de esta forma se lograba mejorar las tasas de envío de cliente y servidor.
+
+En caso de que haya algún tipo de error en la comunicación tanto servidor como cliente deben cerrar la conexión y terminar la ejecución. 
 ## Estructura de mensajes
 En este caso, se implementó la serialización y deserialización de los mensajes enviados por la red que se mapean a un clase directa para poder manipularlos mejor en el código existente de las apuestas.
 
@@ -47,7 +48,7 @@ Todos los mensajes comparten un *header común*, el cual tiene la siguiente estr
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
 
-- `Type (1B)`: Indica el tipo de mensaje (BETS, WINNERS, ERROR, ALL_SENDED). 
+- `Type (1B)`: Indica el tipo de mensaje (BETS, WINNERS, ALL_SENDED, ACK). 
 - `Agency ID (1B)`: Identificador de la agencia que envía el mensaje.
 - `Payload Length (4B)`: Indica la longitud del payload en bytes.
 - `Payload`: Contiene la información específica del mensaje, como los registros de apuestas o ganadores.
@@ -86,16 +87,9 @@ Luego, para hacer posible el envío de varios registros de apuestas en un solo m
 ```
 
 ### `WINNERS` payload
-Análogo al mensaje BETS, solo que en este caso el payload contendrá los registros de apuestas ganadoras, con la misma estructura de registro de apuesta definida anteriormente, solo que en este caso no hay límite de batch?
+Análogo al mensaje BETS, solo que en este caso el payload contendrá los registros de apuestas ganadoras, con la misma estructura de registro de apuesta definida anteriormente, solo que en este caso no hay límite de batch
+pues se considera que la cantidad de apuestas ganadoras es mucho menor que la cantidad de apuestas enviadas en total.
 
-### `ERROR` payload
-
-```
-+---------------------------------------------------------------------+
-|                    Message (variable, UTF-8)                        |
-+---------------------------------------------------------------------+
-```
-- `Message (variable)`: Contiene un mensaje de error descriptivo en formato UTF-8.
 
 ### `ALL_SENDED` y `ACK` payload 
 Por un lado, el mensaje `ALL_SENDED` no contiene payload, ya que su función es únicamente indicar que el cliente ha terminado de enviar todos los registros de apuestas.
@@ -153,3 +147,8 @@ Además de que se puedan soportar múltiples rondas/sorteos sin necesidad de rei
 una vez se alcanzó el quorum, se liberan los hilos y se vuelve a esperar a que se alcance el quorum para la siguiente ronda/sorteo.
 
 ## Cierre limpio de la aplicación
+Para el cliente se usó la librería estándar signal[https://pkg.go.dev/os/signal] para capturar la señal 
+`SIGTERM` con `NotifyContext` que permite devolver el contexto de el padre que lo marcó como *Done* y de esta forma poder indicar el cierre del programa, 
+dicho contexto se marca como *Done* al recibir la señal en la go rutine bloqueante `sistemHandler` en el código.
+En este caso el único file descriptor que podría estar abierto es el socket del cliente (los archivos de input y output en las 
+funciones que se usan tienen la cláusala de defer que se asegura que siempre se cierren)  como también en el main por robustez.

@@ -11,7 +11,6 @@ const (
 	BETS       MessageType = 0x01
 	ALL_SENDED MessageType = 0x02
 	WINNERS    MessageType = 0x03
-	ERROR      MessageType = 0x04
 	ACK        MessageType = 0x05
 )
 
@@ -26,8 +25,6 @@ func (mt MessageType) String() string {
 		return "ALL_SENDED"
 	case WINNERS:
 		return "WINNERS"
-	case ERROR:
-		return "ERROR"
 	case ACK:
 		return "ACK"
 	default:
@@ -74,7 +71,6 @@ func (m *MessageImpl) GetPayload() Payload {
 	return m.Payload
 }
 
-// @ To do revisar batchsize
 func UnmarshalMessage(data []byte, batchSize int) (Message, error) {
 	if len(data) < HeaderLength {
 		return nil, fmt.Errorf("data too short to be a valid message header")
@@ -96,8 +92,6 @@ func UnmarshalMessage(data []byte, batchSize int) (Message, error) {
 		payload = CreateAllSendedPayload()
 	case WINNERS:
 		payload = CreateWinnersPayload(batchSize)
-	case ERROR:
-		payload = CreateErrorPayload("")
 	case ACK:
 		payload = CreateAckPayload()
 	default:

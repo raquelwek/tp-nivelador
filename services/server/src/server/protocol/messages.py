@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 BETS = 0x01
 ALL_SENDED = 0x02
 WINNERS = 0x03
-ERROR = 0x04
 ACK = 0x05
 
 HEADER_LENGTH = 6  # bytes
@@ -59,8 +58,6 @@ def unmarshall_message(data: bytes) -> Message:
         return AllSendedMessage._unmarshall_payload(agency_id, payload)
     elif type_id == WINNERS:
         return WinnersMessage._unmarshall_payload(agency_id, payload)
-    elif type_id == ERROR:
-        return ErrorMessage._unmarshall_payload(agency_id, payload)
     elif type_id == ACK:
         return AckMessage._unmarshall_payload(agency_id, payload)
     else:

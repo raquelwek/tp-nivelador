@@ -1,28 +1,5 @@
 package protocol
 
-type ErrorPayload struct {
-	Message string
-}
-
-func CreateErrorPayload(message string) *ErrorPayload {
-	return &ErrorPayload{
-		Message: message,
-	}
-}
-
-func (p *ErrorPayload) MarshalPayload() ([]byte, error) {
-	return []byte(p.Message), nil
-}
-
-func (p *ErrorPayload) UnmarshalPayload(data []byte) error {
-	p.Message = string(data)
-	return nil
-}
-
-func (p *ErrorPayload) Type() MessageType {
-	return ERROR
-}
-
 type AllSendedPayload struct {
 }
 
