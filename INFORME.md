@@ -23,12 +23,12 @@ El cliente/agencia 1, envía varios batches de apuestas (es decir mensajes que c
 Luego de que haya mandado todos los registros de apuestas, envía el mensaje **ALL_SENDED** para notificar al servidor que ya no enviará más apuestas; es en este punto que el cliente debe quedar a la espera de recibir un mensaje con los ganadores de su agencia o bien vacío si ninguna de sus apuestas fue ganadora.
 Análogamente actúa la agencia 2, pero es importante notar que luego de que ambas agencias hayan enviado todas sus apuestas el servidor calcula el ganador.
 
-> NOTA: Para el ejercicio numero 7, se considera que el `AGENCY_QUORUM_MIN` es 2 o bien el servidor solo tiene esas dos conexiones.?
+> NOTA: Para el ejercicio numero 7, se considera que el `AGENCY_QUORUM_MIN` es 2 o bien el servidor solo tiene esas dos conexiones.
 <p align="center">
   <img src="img/ejemplo_protocolo.svg" alt="Protocolo de comunicación">
 </p>
 
->  ACTUALIZACIÓN; Si bien al comienzo no se tuvieron en cuenta los ACK, se decidió agregarlos para confirmar los mentajes de tipo BETS, 
+>  ACTUALIZACIÓN; Si bien al comienzo no se tuvieron en cuenta los ACK, se decidió agregarlos para confirmar los mensajes de tipo BETS, 
 de esta forma se lograba mejorar las tasas de envío de cliente y servidor.
 
 En caso de que haya algún tipo de error en la comunicación tanto servidor como cliente deben cerrar la conexión y terminar la ejecución. 
@@ -54,6 +54,7 @@ Todos los mensajes comparten un *header común*, el cual tiene la siguiente estr
 - `Payload`: Contiene la información específica del mensaje, como los registros de apuestas o ganadores.
 
 *Nota:* A nivel código, se implementó una clase abstracta `Message` que define la estructura y comportamiento común de todos los mensajes, incluyendo métodos para serializar y deserializar el header y el payload, los cuales varían según el tipo y de ahí que cada uno tenga subclase particular que hereda de `Message` y define su propio comportamiento para el payload. [Ver implementación](services/server/src/server/protocol/messages.py)
+Mientras que para el cliente se implementó una interfaz común `Message` y otra interfaz común para el `Payload` donde cada clase aplicaba su estrategia de marhalling según el tipo.
 
 ### `BETS` payload
 Luego, para hacer posible el envío de varios registros de apuestas en un solo mensaje, definimos la estructura del payload para el mensaje BETS de la siguiente manera:

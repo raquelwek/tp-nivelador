@@ -38,7 +38,7 @@ class Message(ABC):
 def unmarshall_message(data: bytes) -> Message:
     # Import here to avoid circular imports at module load time
     from .bets_records import BetsMessage, WinnersMessage
-    from .simple_messages import AllSendedMessage, ErrorMessage, AckMessage
+    from .simple_messages import AllSendedMessage, AckMessage
     
     if len(data) < HEADER_LENGTH:
         raise ValueError("Data too short to be a valid Message")
